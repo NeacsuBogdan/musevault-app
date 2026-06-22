@@ -1,0 +1,50 @@
+{
+  "name": "musevault",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MuseVault TypeScript monorepo foundation.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=22 <23",
+    "pnpm": ">=10 <11"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "commit": "cz",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prepare": "husky",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,mdx,yml,yaml,css,scss,html}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "19.8.1",
+    "@commitlint/config-conventional": "19.8.1",
+    "@eslint/js": "9.29.0",
+    "commitizen": "4.3.1",
+    "cz-conventional-changelog": "3.3.0",
+    "eslint": "9.29.0",
+    "eslint-config-prettier": "10.1.5",
+    "husky": "9.1.7",
+    "lint-staged": "16.1.2",
+    "prettier": "3.5.3",
+    "typescript": "5.8.3",
+    "typescript-eslint": "8.34.1"
+  }
+}
