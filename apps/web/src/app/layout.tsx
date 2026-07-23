@@ -2,8 +2,12 @@ import type { Metadata } from 'next';
 import '@/styles/globals.css';
 
 export const metadata: Metadata = {
-  title: 'MuseVault',
-  description: 'A creative vault for music ideas, assets, metadata, and workflows.',
+  title: {
+    default: 'MuseVault',
+    template: '%s · MuseVault',
+  },
+  description:
+    'Explore your saved Spotify library and build a foundation for personal music discovery.',
 };
 
 export default function RootLayout({

@@ -11,6 +11,7 @@ coverage/
 # Next.js
 .next/
 out/
+apps/web/next-env.d.ts
 
 # Logs
 logs/
