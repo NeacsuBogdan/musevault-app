@@ -2,32 +2,167 @@
 
 :root {
   color-scheme: dark;
-  background: #09090b;
+
+  /* Semantic colors */
+  --mv-color-page: #080d12;
+  --mv-color-sidebar: #0b1117;
+  --mv-color-surface: #101820;
+  --mv-color-surface-elevated: #141d26;
+  --mv-color-surface-hover: #18232d;
+  --mv-color-text-primary: #f5f7fa;
+  --mv-color-text-secondary: #9aa4af;
+  --mv-color-text-muted: #7a8590;
+  --mv-color-accent-green: #22c55e;
+  --mv-color-accent-green-strong: #34d66f;
+  --mv-color-accent-green-muted: rgb(34 197 94 / 14%);
+  --mv-color-accent-purple: #a78bfa;
+  --mv-color-accent-blue: #60a5fa;
+  --mv-color-accent-pink: #f472b6;
+  --mv-color-accent-yellow: #facc15;
+  --mv-color-border-subtle: rgb(255 255 255 / 7%);
+  --mv-color-border-strong: rgb(255 255 255 / 13%);
+
+  /* Type */
+  --mv-font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Spacing and responsive layout */
+  --mv-page-gutter: 1rem;
+  --mv-dashboard-gap: 1rem;
+  --mv-section-gap: 2rem;
+
+  /* Shape and depth */
+  --mv-radius-control: 0.625rem;
+  --mv-radius-card: 0.875rem;
+  --mv-radius-panel: 1rem;
+  --mv-radius-pill: 9999px;
+  --mv-shadow-card: 0 1px 2px rgb(0 0 0 / 22%), 0 10px 30px rgb(0 0 0 / 12%);
+  --mv-shadow-elevated: 0 16px 40px rgb(0 0 0 / 24%);
+
+  /* Interaction */
+  --mv-focus-color: #4ade80;
+  --mv-focus-width: 2px;
+  --mv-focus-offset: 3px;
+  --mv-duration-fast: 160ms;
+  --mv-duration-standard: 190ms;
+  --mv-duration-slow: 220ms;
+  --mv-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --mv-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-* {
+@media (min-width: 40rem) {
+  :root {
+    --mv-page-gutter: 1.5rem;
+    --mv-dashboard-gap: 1.25rem;
+    --mv-section-gap: 2.5rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --mv-page-gutter: 2rem;
+    --mv-dashboard-gap: 1.5rem;
+    --mv-section-gap: 3rem;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--mv-font-sans);
+
+  --color-page: var(--mv-color-page);
+  --color-sidebar: var(--mv-color-sidebar);
+  --color-surface: var(--mv-color-surface);
+  --color-surface-elevated: var(--mv-color-surface-elevated);
+  --color-surface-hover: var(--mv-color-surface-hover);
+  --color-text-primary: var(--mv-color-text-primary);
+  --color-text-secondary: var(--mv-color-text-secondary);
+  --color-text-muted: var(--mv-color-text-muted);
+  --color-accent-green: var(--mv-color-accent-green);
+  --color-accent-green-strong: var(--mv-color-accent-green-strong);
+  --color-accent-green-muted: var(--mv-color-accent-green-muted);
+  --color-accent-purple: var(--mv-color-accent-purple);
+  --color-accent-blue: var(--mv-color-accent-blue);
+  --color-accent-pink: var(--mv-color-accent-pink);
+  --color-accent-yellow: var(--mv-color-accent-yellow);
+  --color-border-subtle: var(--mv-color-border-subtle);
+  --color-border-strong: var(--mv-color-border-strong);
+  --color-focus-ring: var(--mv-focus-color);
+
+  --text-display: clamp(2.25rem, 5vw, 4rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.045em;
+  --text-page-title: clamp(1.75rem, 3vw, 2.5rem);
+  --text-page-title--line-height: 1.12;
+  --text-page-title--letter-spacing: -0.035em;
+  --text-section-title: 1.25rem;
+  --text-section-title--line-height: 1.3;
+  --text-section-title--letter-spacing: -0.02em;
+  --text-card-title: 1rem;
+  --text-card-title--line-height: 1.4;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.6;
+  --text-body-sm: 0.8125rem;
+  --text-body-sm--line-height: 1.5;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1.4;
+  --text-caption--letter-spacing: 0.08em;
+
+  --spacing-page-gutter: var(--mv-page-gutter);
+  --spacing-dashboard: var(--mv-dashboard-gap);
+  --spacing-section: var(--mv-section-gap);
+
+  --radius-control: var(--mv-radius-control);
+  --radius-card: var(--mv-radius-card);
+  --radius-panel: var(--mv-radius-panel);
+  --radius-pill: var(--mv-radius-pill);
+
+  --shadow-card: var(--mv-shadow-card);
+  --shadow-elevated: var(--mv-shadow-elevated);
+
+  --ease-standard: var(--mv-ease-standard);
+  --ease-emphasized: var(--mv-ease-emphasized);
+}
+
+@utility duration-fast {
+  transition-duration: var(--mv-duration-fast);
+}
+
+@utility duration-standard {
+  transition-duration: var(--mv-duration-standard);
+}
+
+@utility duration-slow {
+  transition-duration: var(--mv-duration-slow);
+}
+
+@utility focus-ring {
+  &:focus-visible {
+    outline: var(--mv-focus-width) solid var(--mv-focus-color);
+    outline-offset: var(--mv-focus-offset);
+  }
+}
+
+*,
+*::before,
+*::after {
+  border-color: var(--mv-color-border-subtle);
   box-sizing: border-box;
 }
 
 html {
   min-height: 100%;
-  background: #09090b;
+  background: var(--mv-color-page);
 }
 
 body {
   min-height: 100%;
   margin: 0;
-  background: #09090b;
-  color: #fafafa;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  background: var(--mv-color-page);
+  color: var(--mv-color-text-primary);
+  font-family: var(--mv-font-sans);
+  line-height: 1.5;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -37,9 +172,14 @@ textarea {
   font: inherit;
 }
 
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: var(--mv-focus-width) solid var(--mv-focus-color);
+  outline-offset: var(--mv-focus-offset);
+}
+
 ::selection {
-  background: rgb(110 231 183 / 25%);
-  color: #ffffff;
+  background: var(--mv-color-accent-green-muted);
+  color: var(--mv-color-text-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {
