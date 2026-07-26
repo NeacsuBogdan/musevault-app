@@ -49,6 +49,7 @@ describe('Spotify response normalization', () => {
         {
           albumImageUrl: 'https://i.scdn.co/image/cover-image',
           albumName: 'A Test Album',
+          artistIds: ['artist-1', 'artist-2'],
           artistNames: ['First Artist', 'Second Artist'],
           durationMs: 215_000,
           explicit: true,

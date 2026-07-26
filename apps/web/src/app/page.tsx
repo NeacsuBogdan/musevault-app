@@ -17,6 +17,10 @@ type HomePageProps = {
 };
 
 const spotifyConnectionErrors: Record<string, { title: string; message: string }> = {
+  authorization_expired: {
+    title: 'Your Spotify connection has expired',
+    message: 'Connect Spotify again to restore secure, read-only access to your saved tracks.',
+  },
   access_denied: {
     title: 'Spotify connection cancelled',
     message:

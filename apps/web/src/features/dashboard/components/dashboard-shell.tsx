@@ -1,4 +1,6 @@
+import type { DashboardDataState, DashboardProfile } from '../types';
 import { DashboardAnalytics } from './dashboard-analytics';
+import { DashboardErrorState } from './dashboard-error-state';
 import { DashboardHeader } from './dashboard-header';
 import { DashboardSidebar } from './dashboard-sidebar';
 import { DashboardStatistics } from './dashboard-statistics';
@@ -6,7 +8,14 @@ import { DashboardUtilityColumn } from './dashboard-utility-column';
 import { MobileBottomNavigation } from './mobile-bottom-navigation';
 import { RediscoverSection } from './rediscover-section';
 
-export function DashboardShell() {
+interface DashboardShellProps {
+  profile: DashboardProfile;
+  state: DashboardDataState;
+}
+
+export function DashboardShell({ profile, state }: DashboardShellProps) {
+  const loadedTrackCount = state.status === 'success' ? state.viewModel.loadedTrackCount : null;
+
   return (
     <div className="min-h-screen bg-page text-text-primary">
       <a
@@ -17,7 +26,11 @@ export function DashboardShell() {
       </a>
 
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <DashboardSidebar />
+        <DashboardSidebar
+          dataStatus={state.status}
+          loadedTrackCount={loadedTrackCount}
+          profile={profile}
+        />
 
         <main
           id="dashboard-main"
@@ -26,18 +39,25 @@ export function DashboardShell() {
         >
           <div className="min-w-0 p-page-gutter">
             <div className="space-y-section">
-              <DashboardHeader />
-              <DashboardStatistics />
+              <DashboardHeader dataStatus={state.status} profile={profile} />
+              {state.status === 'success' ? (
+                <DashboardStatistics statistics={state.viewModel.statistics} />
+              ) : (
+                <DashboardErrorState state={state} />
+              )}
               <DashboardAnalytics />
               <RediscoverSection />
             </div>
           </div>
 
           <aside
-            aria-label="Generated playlists and library health"
+            aria-label="Recently saved tracks and future library features"
             className="min-w-0 border-t border-border-subtle bg-sidebar/45 p-page-gutter pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-page-gutter xl:border-l xl:border-t-0"
           >
-            <DashboardUtilityColumn className="grid grid-cols-1 gap-dashboard sm:grid-cols-2 xl:sticky xl:top-0 xl:grid-cols-1" />
+            <DashboardUtilityColumn
+              className="grid grid-cols-1 gap-dashboard sm:grid-cols-2 xl:sticky xl:top-0 xl:grid-cols-1"
+              recentlySaved={state.status === 'success' ? state.viewModel.recentlySaved : null}
+            />
           </aside>
         </main>
       </div>

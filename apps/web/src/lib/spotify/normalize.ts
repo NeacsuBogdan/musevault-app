@@ -28,6 +28,7 @@ function normalizeSavedTrack(item: SpotifySavedTracksResponse['items'][number]):
     id: item.track.id,
     spotifyUrl: item.track.external_urls.spotify,
     name: item.track.name,
+    artistIds: item.track.artists.map((artist) => artist.id),
     artistNames: item.track.artists.map((artist) => artist.name),
     albumName: item.track.album.name,
     albumImageUrl: safeSpotifyImageUrl(item.track.album.images),

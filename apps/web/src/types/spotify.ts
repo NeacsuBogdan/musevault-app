@@ -8,6 +8,7 @@ export interface SavedTrack {
   id: string;
   spotifyUrl: string;
   name: string;
+  artistIds: string[];
   artistNames: string[];
   albumName: string;
   albumImageUrl: string | null;
