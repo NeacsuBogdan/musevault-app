@@ -11,7 +11,6 @@ import {
   Mic2,
   Music2,
   Settings,
-  WandSparkles,
   type LucideIcon,
   type LucideProps,
 } from 'lucide-react';
@@ -30,7 +29,6 @@ const dashboardIcons: Record<DashboardIconName, LucideIcon> = {
   overview: LayoutDashboard,
   playlists: ListMusic,
   settings: Settings,
-  sparkles: WandSparkles,
   wrapped: Disc3,
 };
 

@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { deleteSession, readSession } from '@/lib/auth/session';
-import { getSpotifySavedTracks } from '@/lib/spotify/client';
 import { parseRetryAfterSeconds, SpotifyApiError } from '@/lib/spotify/errors';
-import { ensureFreshSpotifySession, SpotifyTokenRefreshError } from '@/lib/spotify/tokens';
+import { loadSpotifySavedTracksPage } from '@/lib/spotify/saved-tracks';
+import { SpotifyTokenRefreshError } from '@/lib/spotify/tokens';
 import type { SavedTracksErrorCode, SavedTracksErrorResponse } from '@/types/spotify';
 
 export const dynamic = 'force-dynamic';
@@ -152,22 +152,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    let activeSession = await ensureFreshSpotifySession(session);
+    const page = await loadSpotifySavedTracksPage(session, query.data);
 
-    try {
-      const page = await getSpotifySavedTracks(activeSession.accessToken, query.data);
-
-      return NextResponse.json(page, { headers: NO_STORE_HEADERS });
-    } catch (error) {
-      if (!(error instanceof SpotifyApiError) || error.kind !== 'unauthorized') {
-        throw error;
-      }
-
-      activeSession = await ensureFreshSpotifySession(activeSession, { force: true });
-      const page = await getSpotifySavedTracks(activeSession.accessToken, query.data);
-
-      return NextResponse.json(page, { headers: NO_STORE_HEADERS });
-    }
+    return NextResponse.json(page, { headers: NO_STORE_HEADERS });
   } catch (error) {
     return handleRequestError(error);
   }

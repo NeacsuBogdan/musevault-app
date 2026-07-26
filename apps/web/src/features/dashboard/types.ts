@@ -12,81 +12,55 @@ export type DashboardIconName =
   | 'overview'
   | 'playlists'
   | 'settings'
-  | 'sparkles'
   | 'wrapped';
 
-export interface DashboardNavigationItem {
-  label: string;
-  href: string;
-  icon: DashboardIconName;
-  isActive?: boolean;
-}
-
 export interface DashboardProfile {
-  firstName: string;
   displayName: string;
-  handle: string;
+  firstName: string;
   initials: string;
-}
-
-export interface LibrarySyncStatus {
-  label: string;
-  detail: string;
-  lastSynced: string;
+  imageUrl: string | null;
 }
 
 export interface DashboardStatistic {
   label: string;
   value: string;
-  change: string;
+  helper: string;
   icon: DashboardIconName;
   accent: AccentTone;
 }
 
-export interface EvolutionSeries {
-  label: string;
-  accent: AccentTone;
-  values: readonly number[];
+export interface DashboardRecentTrack {
+  id: string;
+  name: string;
+  artistNames: readonly string[];
+  albumName: string;
+  albumImageUrl: string | null;
+  spotifyUrl: string | null;
+  savedAt: string;
 }
 
-export interface EvolutionSnapshot {
-  rangeLabel: string;
-  summary: string;
-  axisLabels: readonly string[];
-  series: readonly EvolutionSeries[];
+export interface DashboardViewModel {
+  profile: DashboardProfile;
+  statistics: readonly DashboardStatistic[];
+  recentlySaved: readonly DashboardRecentTrack[];
+  loadedTrackCount: number;
 }
 
-export interface MoodSlice {
-  label: string;
-  value: number;
-  accent: AccentTone;
-}
-
-export interface RediscoverCollection {
-  title: string;
-  description: string;
-  trackCount: number;
-  icon: DashboardIconName;
-  accent: AccentTone;
-}
-
-export interface GeneratedPlaylist {
-  title: string;
-  description: string;
-  trackCount: number;
-  duration: string;
-  accent: AccentTone;
-  icon: DashboardIconName;
-}
-
-export interface LibraryHealthMetric {
-  label: string;
-  value: string;
-  status: 'good' | 'attention';
-}
-
-export interface LibraryHealth {
-  score: number;
-  summary: string;
-  metrics: readonly LibraryHealthMetric[];
-}
+export type DashboardDataState =
+  | {
+      status: 'success';
+      viewModel: DashboardViewModel;
+    }
+  | {
+      status: 'authorization_expired';
+    }
+  | {
+      status: 'rate_limited';
+      retryAfter: number | null;
+    }
+  | {
+      status: 'temporarily_unavailable';
+    }
+  | {
+      status: 'unexpected_failure';
+    };

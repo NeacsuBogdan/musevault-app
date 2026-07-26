@@ -73,6 +73,8 @@ function isSavedTrack(value: unknown): value is SavedTrack {
     typeof value.id === 'string' &&
     typeof value.spotifyUrl === 'string' &&
     typeof value.name === 'string' &&
+    Array.isArray(value.artistIds) &&
+    value.artistIds.every((artistId) => typeof artistId === 'string') &&
     Array.isArray(value.artistNames) &&
     value.artistNames.every((artistName) => typeof artistName === 'string') &&
     typeof value.albumName === 'string' &&

@@ -1,55 +1,87 @@
-import { Bell, Plus, Search } from 'lucide-react';
+import { LogOut, Plus, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
 
-import { dashboardProfile } from '../data/dashboard';
+import type { DashboardDataState, DashboardProfile } from '../types';
+import { DashboardProfileAvatar } from './dashboard-profile-avatar';
 
-export function DashboardHeader() {
+interface DashboardHeaderProps {
+  dataStatus: DashboardDataState['status'];
+  profile: DashboardProfile;
+}
+
+export function DashboardHeader({ dataStatus, profile }: DashboardHeaderProps) {
+  const authorizationExpired = dataStatus === 'authorization_expired';
+
   return (
     <header className="flex flex-col gap-5">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Badge tone="green">Overview</Badge>
-            <Badge tone="neutral">Static preview</Badge>
+            <Badge tone={authorizationExpired ? 'yellow' : 'green'}>
+              {authorizationExpired ? 'Reconnect required' : 'Spotify session active'}
+            </Badge>
+            <Badge tone="neutral">Read-only overview</Badge>
           </div>
           <h1 className="text-page-title font-semibold tracking-tight text-text-primary">
-            Good evening, {dashboardProfile.firstName}
+            Welcome back, {profile.firstName}
           </h1>
           <p className="mt-2 max-w-xl text-body text-text-secondary">
-            Your library has a story. Here is what your listening says today.
+            A truthful snapshot of your latest saved tracks, with future MuseVault features clearly
+            marked as previews.
+          </p>
+          <p className="mt-2 text-caption text-text-muted lg:hidden">
+            Connected Spotify profile: {profile.displayName}
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <IconButton aria-label="View notifications" variant="secondary" size="md" type="button">
-            <Bell aria-hidden="true" size={18} />
-          </IconButton>
-          <Button variant="primary" size="md" type="button">
-            <Plus aria-hidden="true" size={17} />
-            New Playlist
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <span className="lg:hidden">
+            <DashboardProfileAvatar profile={profile} />
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            disabled
+            aria-label="New Playlist, coming in a later milestone"
+          >
+            <Plus aria-hidden="true" size={16} />
+            New Playlist · Later
           </Button>
+          <form action="/api/auth/spotify/logout" method="post">
+            <Button variant="ghost" size="sm" type="submit">
+              <LogOut aria-hidden="true" size={16} />
+              Logout
+            </Button>
+          </form>
         </div>
       </div>
 
-      <div role="search" aria-label="Search your music library" className="relative max-w-2xl">
-        <label htmlFor="dashboard-search" className="sr-only">
-          Search your music library
-        </label>
-        <Search
-          aria-hidden="true"
-          size={17}
-          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted"
-        />
-        <input
-          id="dashboard-search"
-          type="search"
-          name="query"
-          placeholder="Search songs, artists, or playlists"
-          className="focus-ring h-11 w-full rounded-control border border-border-subtle bg-surface pl-10 pr-4 text-body-sm text-text-primary shadow-card outline-none transition-[border-color,background-color] duration-standard ease-standard placeholder:text-text-muted hover:border-border-strong focus:border-accent-green/60"
-        />
+      <div className="max-w-2xl">
+        <div className="relative">
+          <label htmlFor="dashboard-search" className="sr-only">
+            Search your music library, coming in a later milestone
+          </label>
+          <Search
+            aria-hidden="true"
+            size={17}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted"
+          />
+          <input
+            id="dashboard-search"
+            type="search"
+            name="query"
+            placeholder="Search is coming in a later milestone"
+            disabled
+            aria-describedby="dashboard-search-help"
+            className="h-11 w-full cursor-not-allowed rounded-control border border-border-subtle bg-surface pl-10 pr-4 text-body-sm text-text-muted shadow-card outline-none placeholder:text-text-muted disabled:opacity-70"
+          />
+        </div>
+        <p id="dashboard-search-help" className="mt-2 text-caption text-text-muted">
+          Search is disabled until MuseVault supports a complete library index.
+        </p>
       </div>
     </header>
   );
