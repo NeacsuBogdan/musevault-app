@@ -3,9 +3,11 @@
 MuseVault is a personal music-discovery application that connects to Spotify, reads a listener's
 saved tracks, and will eventually use that library as the basis for independent music suggestions.
 
-The current vertical slice provides secure Spotify connection, a protected saved-tracks library,
-access-token refresh, and logout. It does not yet include a database, full-library synchronization,
-or a recommendation engine.
+The current Next.js App Router application provides secure Spotify connection, a protected
+saved-tracks library, access-token refresh, and logout. It also includes a responsive dashboard
+preview at `/dashboard`; the dashboard currently uses static mock data and is not yet connected to
+the Spotify library or recommendation logic. See the [MuseVault design system](docs/design-system.md)
+for its visual and component foundations.
 
 ## Repository structure
 
@@ -54,7 +56,7 @@ pnpm --filter @musevault/web dev
 ```
 
 Open `http://127.0.0.1:3000`. Use this host exactly; Spotify does not accept `localhost` as a
-redirect URI.
+redirect URI. The static dashboard preview is available at `http://127.0.0.1:3000/dashboard`.
 
 ## Environment variables
 
