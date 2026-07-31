@@ -46,9 +46,14 @@ const spotifyConnectionErrors: Record<string, { title: string; message: string }
     title: 'Your Spotify profile could not be loaded',
     message: 'MuseVault could not finish setting up your connection. Please try again.',
   },
+  persistence_failed: {
+    title: 'Your Spotify connection could not be saved',
+    message: 'MuseVault could not securely save your connection. Please start a new one.',
+  },
   session_failed: {
     title: 'The secure session could not be created',
-    message: 'Your Spotify connection was not saved. Please start a new connection.',
+    message:
+      'Your Spotify connection was saved, but the secure browser session could not be created. Please start a new connection.',
   },
 };
 
@@ -142,8 +147,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <ConnectedProfile displayName={session.displayName} imageUrl={session.imageUrl} />
                 </div>
                 <p className="mt-6 text-sm leading-6 text-zinc-400">
-                  Your access and refresh tokens stay encrypted in an HttpOnly session and are never
-                  sent to browser code.
+                  Your Spotify credentials stay server-side. The refresh token is encrypted at rest,
+                  and the existing encrypted HttpOnly session keeps this browser connected.
                 </p>
               </>
             ) : (

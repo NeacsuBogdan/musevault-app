@@ -2,6 +2,8 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import { parsePostgresDatabaseUrl } from '@/lib/database-environment';
+
 const httpUrlSchema = z
   .string()
   .trim()
@@ -64,6 +66,8 @@ export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 
 const sessionSecretSchema = z.string().min(32, 'Must contain at least 32 characters');
 
+const CANONICAL_SPOTIFY_TOKEN_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
 export class EnvironmentConfigurationError extends Error {
   readonly variables: readonly string[];
 
@@ -82,6 +86,53 @@ export function getSessionSecret(): string {
   }
 
   return result.data;
+}
+
+export function getDatabaseUrl(): string {
+  const databaseUrl = parsePostgresDatabaseUrl(process.env.DATABASE_URL, 'pooled');
+
+  if (!databaseUrl) {
+    throw new EnvironmentConfigurationError(['DATABASE_URL']);
+  }
+
+  return databaseUrl;
+}
+
+/**
+ * Validates the direct database URL only when server-side migration tooling or
+ * an explicit administrative path requests it. Application queries use
+ * `getDatabaseUrl()` and do not depend on this variable.
+ */
+export function getDatabaseMigrationUrl(): string {
+  const databaseMigrationUrl = parsePostgresDatabaseUrl(
+    process.env.DATABASE_MIGRATION_URL,
+    'direct',
+  );
+
+  if (!databaseMigrationUrl) {
+    throw new EnvironmentConfigurationError(['DATABASE_MIGRATION_URL']);
+  }
+
+  return databaseMigrationUrl;
+}
+
+export function getSpotifyTokenEncryptionKey(): Buffer {
+  const serializedKey = process.env.SPOTIFY_TOKEN_ENCRYPTION_KEY;
+
+  if (
+    typeof serializedKey !== 'string' ||
+    !CANONICAL_SPOTIFY_TOKEN_KEY_PATTERN.test(serializedKey)
+  ) {
+    throw new EnvironmentConfigurationError(['SPOTIFY_TOKEN_ENCRYPTION_KEY']);
+  }
+
+  const key = Buffer.from(serializedKey, 'base64url');
+
+  if (key.length !== 32 || key.toString('base64url') !== serializedKey) {
+    throw new EnvironmentConfigurationError(['SPOTIFY_TOKEN_ENCRYPTION_KEY']);
+  }
+
+  return key;
 }
 
 /**
