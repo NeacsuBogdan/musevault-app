@@ -13,7 +13,7 @@ const authorizationTokenSchema = z.object({
   access_token: z.string().min(1),
   expires_in: z.number().int().positive(),
   refresh_token: z.string().min(1),
-  scope: z.string().optional(),
+  scope: z.string().trim().min(1).optional(),
   token_type: z.string().toLowerCase().pipe(z.literal('bearer')),
 });
 
@@ -31,6 +31,7 @@ export interface OAuthTransaction {
 export interface SpotifyAuthorizationToken {
   accessToken: string;
   expiresInSeconds: number;
+  grantedScopes: readonly string[];
   refreshToken: string;
 }
 
@@ -151,18 +152,18 @@ export async function exchangeSpotifyAuthorizationCode(
     throw new SpotifyAuthorizationError('Spotify returned an invalid token response.');
   }
 
-  const grantedScopes = new Set(token.data.scope?.split(/\s+/).filter(Boolean) ?? []);
+  const grantedScopes = new Set(
+    (token.data.scope ?? SPOTIFY_AUTHORIZATION_SCOPE).split(/\s+/).filter(Boolean),
+  );
 
-  if (
-    grantedScopes.size > 0 &&
-    REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES.some((scope) => !grantedScopes.has(scope))
-  ) {
+  if (REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES.some((scope) => !grantedScopes.has(scope))) {
     throw new SpotifyAuthorizationError('Spotify did not grant the required access.');
   }
 
   return {
     accessToken: token.data.access_token,
     expiresInSeconds: token.data.expires_in,
+    grantedScopes: [...grantedScopes],
     refreshToken: token.data.refresh_token,
   };
 }

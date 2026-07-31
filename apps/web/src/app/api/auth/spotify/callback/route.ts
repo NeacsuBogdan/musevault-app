@@ -13,6 +13,7 @@ import {
   type SpotifyAuthorizationToken,
 } from '@/lib/auth/oauth';
 import { writeSession } from '@/lib/auth/session';
+import { upsertSpotifyUserAndConnection } from '@/lib/db/repositories/spotify-connections';
 import { getServerEnv, type ServerEnvironment } from '@/lib/env';
 import { getSpotifyProfile } from '@/lib/spotify/client';
 
@@ -23,6 +24,7 @@ type CallbackErrorCode =
   | 'access_denied'
   | 'authorization_failed'
   | 'invalid_callback'
+  | 'persistence_failed'
   | 'profile_failed'
   | 'session_failed'
   | 'state_mismatch'
@@ -112,6 +114,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     profile = await getSpotifyProfile(token.accessToken);
   } catch {
     return callbackRedirect(environment, '/', 'profile_failed');
+  }
+
+  try {
+    await upsertSpotifyUserAndConnection({
+      displayName: profile.displayName,
+      grantedScopes: token.grantedScopes,
+      imageUrl: profile.imageUrl,
+      refreshToken: token.refreshToken,
+      spotifyAccountId: profile.accountId,
+    });
+  } catch {
+    return callbackRedirect(environment, '/', 'persistence_failed');
   }
 
   try {

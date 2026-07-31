@@ -12,6 +12,9 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "commit": "cz",
+    "db:generate": "pnpm --filter @musevault/web db:generate",
+    "db:migrate": "pnpm --filter @musevault/web db:migrate",
+    "db:studio": "pnpm --filter @musevault/web db:studio",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "lint": "eslint .",

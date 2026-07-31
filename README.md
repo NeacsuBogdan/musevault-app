@@ -4,11 +4,12 @@ MuseVault is a personal music-discovery application that connects to Spotify, re
 saved tracks, and will eventually use that library as the basis for independent music suggestions.
 
 The current Next.js App Router application provides secure Spotify connection, a protected
-saved-tracks library, access-token refresh, logout, and an authenticated dashboard at `/dashboard`.
-The dashboard uses Spotify's saved-track total and the latest page of up to 50 tracks for its real
-library overview; analytics, recommendations, health scoring, and playlist generation remain
-clearly labelled previews. See the [dashboard data guide](docs/dashboard-data.md) for field-level
-details and the [MuseVault design system](docs/design-system.md) for the visual foundations.
+saved-tracks library, access-token refresh, logout, an authenticated dashboard at `/dashboard`, and
+a Neon database foundation for the persistent Spotify connection. The dashboard uses Spotify's
+saved-track total and the latest page of up to 50 tracks for its real library overview; analytics,
+recommendations, health scoring, and playlist generation remain clearly labelled previews. See the
+[database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
+and [MuseVault design system](docs/design-system.md) for details.
 
 ## Repository structure
 
@@ -29,6 +30,7 @@ The packages under `packages/` are placeholders; current application code remain
 - pnpm 10
 - A Spotify Developer application
 - Spotify Premium on the owner account while the application is in Development Mode
+- A Neon development branch with pooled and direct connection strings
 
 ## Local installation
 
@@ -50,7 +52,12 @@ On PowerShell:
 Copy-Item apps/web/.env.example apps/web/.env.local
 ```
 
-Fill in the real Spotify credentials and a strong session secret, then start the web application:
+Fill in the server-only Spotify, session, database, and token-encryption values. Apply the generated
+development migration, then start the web application:
+
+```bash
+pnpm db:migrate
+```
 
 ```bash
 pnpm --filter @musevault/web dev
@@ -64,13 +71,16 @@ redirect URI. After connecting Spotify, the authenticated dashboard is available
 
 `apps/web/.env.local` must provide:
 
-| Variable                | Purpose                                                             |
-| ----------------------- | ------------------------------------------------------------------- |
-| `APP_URL`               | Canonical application origin, locally `http://127.0.0.1:3000`       |
-| `SPOTIFY_CLIENT_ID`     | Client ID from the Spotify Developer Dashboard                      |
-| `SPOTIFY_CLIENT_SECRET` | Server-only Spotify client secret                                   |
-| `SPOTIFY_REDIRECT_URI`  | Exact registered OAuth callback URL                                 |
-| `SESSION_SECRET`        | At least 32 random characters used to derive the JWE encryption key |
+| Variable                       | Purpose                                                             |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `APP_URL`                      | Canonical application origin, locally `http://127.0.0.1:3000`       |
+| `SPOTIFY_CLIENT_ID`            | Client ID from the Spotify Developer Dashboard                      |
+| `SPOTIFY_CLIENT_SECRET`        | Server-only Spotify client secret                                   |
+| `SPOTIFY_REDIRECT_URI`         | Exact registered OAuth callback URL                                 |
+| `SESSION_SECRET`               | At least 32 random characters used to derive the JWE encryption key |
+| `DATABASE_URL`                 | Pooled Neon development connection for application queries          |
+| `DATABASE_MIGRATION_URL`       | Direct Neon development connection for Drizzle Kit migrations       |
+| `SPOTIFY_TOKEN_ENCRYPTION_KEY` | Base64url encoding of exactly 32 random bytes                       |
 
 No secret uses a `NEXT_PUBLIC_` prefix. Environment values are validated only when an
 authentication runtime path needs them, so compilation and secretless CI remain possible.
@@ -96,15 +106,29 @@ Artists, Audio Features, or Audio Analysis endpoints.
 
 - Authorization Code flow with PKCE (`S256`) and OAuth `state` validation.
 - Short-lived HttpOnly cookies hold the state and PKCE verifier.
-- Spotify tokens live only inside an encrypted, HttpOnly JWE session cookie.
+- The access token and a temporary refresh-token copy remain in the encrypted HttpOnly JWE session.
+- A separately encrypted refresh token and the granted scopes persist in Neon after OAuth.
 - Client Components and public API responses never receive access or refresh tokens.
 - Access tokens refresh shortly before expiry and once after an unexpected Spotify `401`.
 - Spotify `account_id`, not the legacy profile `id`, is the stable account identifier.
 
-There is no database. A future persistence milestone must define encrypted refresh-token storage
-before background synchronization or durable multi-device sessions are added. Concurrent refreshes
-are deduplicated within one server process; coordinating refresh rotation across multiple deployed
-instances remains a future persistence concern.
+The database currently stores only the user and persistent Spotify connection. It does not contain
+saved tracks or power the dashboard. See the [database foundation](docs/database-foundation.md) for
+the schema, encryption format, migration workflow, temporary cookie duplication, and limitations.
+Concurrent request-time refreshes remain deduplicated within one server process.
+
+## Database commands
+
+Run these from the repository root against the configured Neon development branch:
+
+```bash
+pnpm db:generate
+pnpm db:migrate
+pnpm db:studio
+```
+
+Generate and commit SQL migrations from the Drizzle schema; do not use `drizzle-kit push` as the
+normal workflow.
 
 ## Development commands
 
@@ -116,6 +140,8 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm db:generate
+pnpm db:migrate
 ```
 
 The web typecheck runs `next typegen` before TypeScript so clean checkouts have current App Router
