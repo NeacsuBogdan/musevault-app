@@ -112,9 +112,11 @@ Artists, Audio Features, or Audio Analysis endpoints.
 - Access tokens refresh shortly before expiry and once after an unexpected Spotify `401`.
 - Spotify `account_id`, not the legacy profile `id`, is the stable account identifier.
 
-The database currently stores only the user and persistent Spotify connection. It does not contain
-saved tracks or power the dashboard. See the [database foundation](docs/database-foundation.md) for
-the schema, encryption format, migration workflow, temporary cookie duplication, and limitations.
+The database stores the user, persistent Spotify connection, and a normalized full-library
+snapshot. The dashboard intentionally remains live and page-bounded. See the
+[database foundation](docs/database-foundation.md) and
+[full library synchronization](docs/full-library-sync.md) for the schema, migration workflow,
+chunked protocol, snapshot guarantees, and limitations.
 Concurrent request-time refreshes remain deduplicated within one server process.
 
 ## Database commands

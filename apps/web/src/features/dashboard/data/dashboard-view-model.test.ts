@@ -17,6 +17,7 @@ const profile: SpotifyProfile = {
 function createTrack(index: number, overrides: Partial<SavedTrack> = {}): SavedTrack {
   return {
     id: `track-${index}`,
+    albumId: `album-${index}`,
     spotifyUrl: `https://open.spotify.com/track/track-${index}`,
     name: `Track ${index}`,
     artistIds: [`artist-${index}`],

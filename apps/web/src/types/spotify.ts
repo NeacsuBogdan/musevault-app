@@ -6,6 +6,7 @@ export interface SpotifyProfile {
 
 export interface SavedTrack {
   id: string;
+  albumId: string;
   spotifyUrl: string;
   name: string;
   artistIds: string[];

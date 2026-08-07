@@ -35,6 +35,7 @@ const spotifyArtistSchema = z.object({
 });
 
 const spotifyAlbumSchema = z.object({
+  id: z.string().min(1),
   images: z.array(spotifyImageSchema),
   name: z.string(),
 });
