@@ -71,6 +71,7 @@ function isSavedTrack(value: unknown): value is SavedTrack {
 
   return (
     typeof value.id === 'string' &&
+    typeof value.albumId === 'string' &&
     typeof value.spotifyUrl === 'string' &&
     typeof value.name === 'string' &&
     Array.isArray(value.artistIds) &&

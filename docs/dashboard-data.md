@@ -43,8 +43,8 @@ saved-tracks API route. Dashboard errors are mapped separately to fixed, user-sa
 ## Current limitations
 
 - MuseVault loads only the first saved-tracks page, with a maximum of 50 tracks.
-- The persistent Spotify connection exists, but there is no background synchronization or
-  persistent library snapshot and the dashboard does not query the database yet.
+- Full-library snapshots can now be persisted manually, but there is no background or incremental
+  synchronization and the dashboard does not query the database yet.
 - Page-limited artist and duration statistics cannot represent larger libraries.
 - Recently Saved is limited to the tracks available in the current page.
 - Listening analytics, recommendations, library health, and playlist generation are not connected.

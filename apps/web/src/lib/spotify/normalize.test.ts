@@ -12,6 +12,7 @@ describe('Spotify response normalization', () => {
           added_at: '2026-07-01T12:34:56Z',
           track: {
             album: {
+              id: 'album-1',
               album_type: 'album',
               images: [
                 {
@@ -47,6 +48,7 @@ describe('Spotify response normalization', () => {
     expect(normalizeSpotifySavedTracks(response)).toEqual({
       items: [
         {
+          albumId: 'album-1',
           albumImageUrl: 'https://i.scdn.co/image/cover-image',
           albumName: 'A Test Album',
           artistIds: ['artist-1', 'artist-2'],
@@ -63,6 +65,30 @@ describe('Spotify response normalization', () => {
       offset: 0,
       total: 1,
     });
+  });
+
+  it('rejects a saved track with a missing stable album identifier', () => {
+    expect(() =>
+      spotifySavedTracksResponseSchema.parse({
+        items: [
+          {
+            added_at: '2026-07-01T12:34:56Z',
+            track: {
+              album: { images: [], name: 'Missing ID' },
+              artists: [{ id: 'artist-1', name: 'Artist' }],
+              duration_ms: 1,
+              explicit: false,
+              external_urls: { spotify: 'https://open.spotify.com/track/track-1' },
+              id: 'track-1',
+              name: 'Track',
+            },
+          },
+        ],
+        limit: 50,
+        offset: 0,
+        total: 1,
+      }),
+    ).toThrow();
   });
 
   it('uses safe profile fallbacks and drops unsupported image hosts', () => {

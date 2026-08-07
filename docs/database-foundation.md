@@ -1,8 +1,8 @@
 # Database foundation
 
-MuseVault uses a Neon development branch for the first persistence milestone. The database stores
-the Spotify account identity, safe profile fields, granted scopes, and an encrypted refresh token.
-It does not store tracks or drive the library and dashboard views yet.
+MuseVault uses a Neon development branch for persistence. The database stores the Spotify account
+identity, safe profile fields, granted scopes, encrypted refresh token, and normalized saved
+library. It does not drive the dashboard yet.
 
 ## Connections and driver
 
@@ -37,7 +37,9 @@ Neither importing the database modules nor running the normal unit suite opens a
 - connection, update, and nullable last-successful-sync timestamps with time zone.
 
 The one-to-one relationship is enforced by the unique Spotify account ID and unique connection
-user ID. There are no track, artist, album, playlist, analytics, history, snapshot, or job tables.
+user ID. Milestone 3B adds normalized track, artist, album, ordered relationship, membership, and
+full-sync tables. See [full-library-sync.md](full-library-sync.md) for their constraints and snapshot
+protocol. There are no playlist, listening-history, analytics-job, queue, or scheduler tables.
 
 ## Refresh-token encryption
 

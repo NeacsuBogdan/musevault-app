@@ -26,6 +26,7 @@ export function normalizeSpotifyProfile(profile: SpotifyProfileResponse): Spotif
 function normalizeSavedTrack(item: SpotifySavedTracksResponse['items'][number]): SavedTrack {
   return {
     id: item.track.id,
+    albumId: item.track.album.id,
     spotifyUrl: item.track.external_urls.spotify,
     name: item.track.name,
     artistIds: item.track.artists.map((artist) => artist.id),

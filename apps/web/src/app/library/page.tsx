@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ConnectedProfile } from '@/components/connected-profile';
+import { FullLibrarySync } from '@/components/full-library-sync';
 import { SavedTracksList } from '@/components/saved-tracks-list';
 import { readSession } from '@/lib/auth/session';
 
@@ -62,6 +63,8 @@ export default async function LibraryPage() {
           </div>
           <ConnectedProfile displayName={session.displayName} imageUrl={session.imageUrl} compact />
         </section>
+
+        <FullLibrarySync />
 
         <SavedTracksList />
       </div>
