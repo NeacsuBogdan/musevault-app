@@ -14,13 +14,15 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'private, no-store' };
 
 function safeError(error: FullLibrarySyncError): NextResponse {
   const status =
-    error.code === 'authorization_expired'
-      ? 401
-      : error.code === 'rate_limited'
-        ? 429
-        : error.code === 'database_failure' || error.code === 'unexpected_failure'
-          ? 500
-          : 503;
+    error.code === 'sync_in_progress'
+      ? 409
+      : error.code === 'authorization_expired'
+        ? 401
+        : error.code === 'rate_limited'
+          ? 429
+          : error.code === 'database_failure' || error.code === 'unexpected_failure'
+            ? 500
+            : 503;
   const headers = new Headers(NO_STORE_HEADERS);
 
   if (error.retryAfter !== null) headers.set('Retry-After', String(error.retryAfter));

@@ -1,6 +1,6 @@
 # Full library synchronization
 
-Milestone 3B persists a complete, resumable snapshot of a connected user's Spotify Liked Songs. It does not implement incremental or scheduled synchronization.
+Milestone 3B persists a complete, resumable snapshot of a connected user's Spotify Liked Songs. Milestone 3C keeps this engine authoritative and adds a conservative incremental optimization documented in [incremental-library-sync.md](incremental-library-sync.md).
 
 ## Architecture and protocol
 
@@ -14,7 +14,7 @@ The Spotify boundary remains raw JSON, Zod validation, then normalized applicati
 - `spotify_tracks` belongs to an album.
 - `spotify_track_artists` is ordered; `(track_id, artist_id)` is primary and `(track_id, position)` is unique.
 - `user_saved_tracks` records membership, `saved_at`, and `last_seen_sync_id`.
-- `spotify_library_syncs` records running, completed, and failed full runs.
+- `spotify_library_syncs` records running, completed, and failed runs, their `full` or `incremental` kind, and fixed safe result codes.
 
 Checks prevent negative durations, positions, offsets, totals, and processed counts. User/order/cleanup indexes support queries. A partial unique index permits only one `running` sync per user.
 
@@ -26,7 +26,7 @@ A page is final when it is empty, has fewer than 50 items, or its returned offse
 
 Each chunk transaction takes a PostgreSQL transaction advisory lock derived from the user UUID. Concurrent tabs serialize before selecting or creating the active run; the partial unique index is a second guard. Upserts and persisted offsets make retries safe after a response is lost.
 
-Rate limits retain a safe numeric `Retry-After`; the UI stops rather than immediately retrying. Authorization expiry marks the run failed and requests reconnection. Rate-limit, temporary, and database failures keep progress resumable. Only fixed codes are stored. Raw Spotify/database errors are never returned or persisted.
+Rate limits retain a safe numeric `Retry-After`; the UI waits before retrying. Authorization expiry marks the run failed and requests reconnection. Rate-limit, temporary, and database failures keep full-sync progress resumable. Only fixed codes are stored. Raw Spotify/database errors are never returned or persisted.
 
 ## Persisted queries
 
@@ -34,7 +34,7 @@ Rate limits retain a safe numeric `Retry-After`; the UI stops rather than immedi
 
 ## Limitations and security
 
-Spotify changes during offset pagination can produce an eventually consistent snapshot. A later incremental-sync milestone will improve freshness. The encrypted HttpOnly session still carries access and refresh tokens. A rotated refresh token is updated in the cookie but not yet mirrored to `spotify_connections`; that known Milestone 3A debt remains intentionally out of scope.
+Spotify changes during offset pagination can produce an eventually consistent snapshot. Incremental head scans improve common-case freshness but deliberately fall back to this full reconciliation whenever correctness is uncertain. The encrypted HttpOnly session still carries access and refresh tokens. A rotated refresh token is updated in the cookie but not yet mirrored to `spotify_connections`; that known Milestone 3A debt remains intentionally out of scope.
 
 No library table stores tokens, ciphertext, connection details, SQL, or stack traces. No OAuth scope, worker, queue, Redis, cron, or production migration is added.
 
@@ -47,4 +47,4 @@ No library table stores tokens, ciphertext, connection details, SQL, or stack tr
 5. Confirm `/dashboard` and logout still work.
 6. Inspect development-branch constraints and aggregate counts only; do not select token or user-content columns.
 
-The next milestone will connect complete persisted data to dashboard analytics and add incremental freshness.
+The next milestone will connect complete persisted data to dashboard analytics.

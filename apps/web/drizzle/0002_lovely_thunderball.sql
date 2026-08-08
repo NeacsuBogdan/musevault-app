@@ -1,0 +1,4 @@
+ALTER TABLE "spotify_library_syncs" ADD COLUMN "sync_kind" text DEFAULT 'full' NOT NULL;--> statement-breakpoint
+ALTER TABLE "spotify_library_syncs" ADD COLUMN "result_code" text;--> statement-breakpoint
+ALTER TABLE "spotify_library_syncs" ADD CONSTRAINT "spotify_library_syncs_sync_kind_valid" CHECK ("spotify_library_syncs"."sync_kind" in ('full', 'incremental'));--> statement-breakpoint
+ALTER TABLE "spotify_library_syncs" ADD CONSTRAINT "spotify_library_syncs_result_code_valid" CHECK ("spotify_library_syncs"."result_code" is null or "spotify_library_syncs"."result_code" in ('applied', 'no_changes', 'full_sync_required'));
