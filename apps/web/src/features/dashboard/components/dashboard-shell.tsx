@@ -14,8 +14,6 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ profile, state }: DashboardShellProps) {
-  const loadedTrackCount = state.status === 'success' ? state.viewModel.loadedTrackCount : null;
-
   return (
     <div className="min-h-screen bg-page text-text-primary">
       <a
@@ -28,8 +26,11 @@ export function DashboardShell({ profile, state }: DashboardShellProps) {
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         <DashboardSidebar
           dataStatus={state.status}
-          loadedTrackCount={loadedTrackCount}
+          lastSuccessfulSyncAt={
+            state.status === 'success' ? state.viewModel.lastSuccessfulSyncAt : null
+          }
           profile={profile}
+          savedTrackCount={state.status === 'success' ? state.viewModel.savedTrackCount : null}
         />
 
         <main

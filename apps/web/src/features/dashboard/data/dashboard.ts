@@ -76,7 +76,7 @@ export const mobileNavigation: readonly DashboardNavigationEntry[] = [
 export const rediscoverPreviews: readonly RediscoverPreview[] = [
   {
     title: 'Forgotten Songs',
-    description: 'Will surface older favorites after MuseVault can sync your full library.',
+    description: 'Will surface older favorites after the Rediscover engine is implemented.',
     icon: 'history',
     accent: 'purple',
   },
@@ -94,8 +94,7 @@ export const rediscoverPreviews: readonly RediscoverPreview[] = [
   },
   {
     title: 'Deep Cuts',
-    description:
-      'Will highlight overlooked tracks after MuseVault can analyze your full collection.',
+    description: 'Will highlight overlooked tracks after library analysis is implemented.',
     icon: 'music',
     accent: 'pink',
   },

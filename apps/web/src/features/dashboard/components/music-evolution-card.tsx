@@ -60,7 +60,7 @@ export function MusicEvolutionCard() {
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
             <span className="inline-flex items-center gap-2 rounded-pill border border-border-strong bg-surface-elevated/95 px-3 py-2 text-caption font-semibold text-text-primary shadow-card">
               <ChartNoAxesCombined aria-hidden="true" size={15} className="text-accent-green" />
-              Requires full library sync
+              Not calculated yet
             </span>
           </div>
         </div>

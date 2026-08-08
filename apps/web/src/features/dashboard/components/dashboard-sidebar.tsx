@@ -9,14 +9,29 @@ import { DashboardProfileAvatar } from './dashboard-profile-avatar';
 
 interface DashboardSidebarProps {
   dataStatus: DashboardDataState['status'];
-  loadedTrackCount: number | null;
+  lastSuccessfulSyncAt: string | null;
   profile: DashboardProfile;
+  savedTrackCount: number | null;
 }
 
-export function DashboardSidebar({ dataStatus, loadedTrackCount, profile }: DashboardSidebarProps) {
-  const libraryAvailable = loadedTrackCount !== null;
-  const authorizationExpired = dataStatus === 'authorization_expired';
+const syncDateFormatter = new Intl.DateTimeFormat('en-US', {
+  day: 'numeric',
+  month: 'short',
+  timeZone: 'UTC',
+  year: 'numeric',
+});
+
+export function DashboardSidebar({
+  dataStatus,
+  lastSuccessfulSyncAt,
+  profile,
+  savedTrackCount,
+}: DashboardSidebarProps) {
+  const libraryAvailable = savedTrackCount !== null;
   const StatusIcon = libraryAvailable ? CheckCircle2 : CircleAlert;
+  const syncDate = lastSuccessfulSyncAt
+    ? syncDateFormatter.format(new Date(lastSuccessfulSyncAt))
+    : null;
 
   return (
     <aside
@@ -99,19 +114,21 @@ export function DashboardSidebar({ dataStatus, loadedTrackCount, profile }: Dash
             </span>
             <div className="min-w-0">
               <p className="text-body-sm font-semibold text-text-primary">
-                {authorizationExpired ? 'Reconnect required' : 'Spotify session active'}
+                {libraryAvailable
+                  ? 'Persistent library snapshot'
+                  : dataStatus === 'sync_in_progress'
+                    ? 'Library sync in progress'
+                    : dataStatus === 'sync_required'
+                      ? 'Initial sync required'
+                      : 'Library snapshot unavailable'}
               </p>
               <p className="mt-0.5 text-caption text-text-secondary">
                 {libraryAvailable
-                  ? `${loadedTrackCount} recent track${loadedTrackCount === 1 ? '' : 's'} loaded`
-                  : authorizationExpired
-                    ? 'Authorization has expired'
-                    : 'Library overview unavailable'}
+                  ? `${savedTrackCount.toLocaleString('en-US')} track${savedTrackCount === 1 ? '' : 's'} synced`
+                  : 'Open Library to manage synchronization'}
               </p>
               <p className="mt-2 text-caption text-text-muted">
-                {libraryAvailable
-                  ? 'Latest page only · no persistent sync'
-                  : 'No library data was loaded'}
+                {syncDate ? `Last synced ${syncDate} UTC` : 'No completed snapshot available'}
               </p>
             </div>
           </div>

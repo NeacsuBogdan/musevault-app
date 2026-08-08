@@ -25,7 +25,7 @@ export function DashboardStatistics({ statistics }: DashboardStatisticsProps) {
                 >
                   <DashboardIcon name={statistic.icon} size={17} strokeWidth={2} />
                 </span>
-                <Badge tone="neutral">Spotify data</Badge>
+                <Badge tone="neutral">Synced library</Badge>
               </div>
               <h3 className="mt-5 text-caption font-medium text-text-secondary">
                 {statistic.label}

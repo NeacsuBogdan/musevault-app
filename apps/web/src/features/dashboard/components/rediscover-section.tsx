@@ -14,7 +14,7 @@ export function RediscoverSection() {
         eyebrow="Product preview"
         title="Rediscover your library"
         description="Recommendation concepts for a later milestone. These cards are not generated from your Spotify data."
-        action={<Badge tone="neutral">Requires full library sync</Badge>}
+        action={<Badge tone="neutral">Not calculated yet</Badge>}
       />
 
       <div className="mt-5 grid grid-cols-1 gap-dashboard sm:grid-cols-2">

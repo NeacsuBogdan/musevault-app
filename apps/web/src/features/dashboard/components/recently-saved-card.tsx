@@ -62,14 +62,14 @@ export function RecentlySavedCard({ headingId, tracks }: RecentlySavedCardProps)
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-caption font-semibold uppercase tracking-[0.1em] text-accent-green">
-            Latest library page
+            Saved snapshot
           </p>
           <h2 id={headingId} className="mt-1.5 text-card-title font-semibold text-text-primary">
             Recently Saved
           </h2>
         </div>
         <Badge tone={tracks === null ? 'yellow' : 'green'}>
-          {tracks === null ? 'Unavailable' : 'Spotify data'}
+          {tracks === null ? 'Unavailable' : 'Synced library'}
         </Badge>
       </div>
 
@@ -92,7 +92,7 @@ export function RecentlySavedCard({ headingId, tracks }: RecentlySavedCardProps)
           <Music2 aria-hidden="true" size={20} className="mx-auto text-text-muted" />
           <p className="mt-3 text-body-sm font-semibold text-text-primary">No saved tracks yet</p>
           <p className="mt-1 text-caption leading-5 text-text-secondary">
-            Save a song on Spotify, then reload this dashboard.
+            Save a song on Spotify, synchronize from Library, then return here.
           </p>
         </div>
       ) : (

@@ -30,7 +30,8 @@ export function LibraryHealthCard({ headingId }: LibraryHealthCardProps) {
           No health score is calculated yet
         </p>
         <p className="mt-2 text-caption leading-5 text-text-secondary">
-          Accurate collection-quality signals require a persistent, full-library sync.
+          No health score is calculated yet. Library-quality analysis will be implemented in a later
+          milestone.
         </p>
       </div>
 
