@@ -15,6 +15,13 @@
       "when": 1786141698693,
       "tag": "0001_dapper_maelstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786183277472,
+      "tag": "0002_lovely_thunderball",
+      "breakpoints": true
     }
   ]
 }

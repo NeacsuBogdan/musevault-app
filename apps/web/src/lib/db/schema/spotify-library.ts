@@ -85,11 +85,21 @@ export const spotifyLibrarySyncs = pgTable(
     completedAt: timestamp('completed_at', { mode: 'date', withTimezone: true }),
     updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
     failureCode: text('failure_code'),
+    syncKind: text('sync_kind').default('full').notNull(),
+    resultCode: text('result_code'),
   },
   (table) => [
     check(
       'spotify_library_syncs_status_valid',
       sql`${table.status} in ('running', 'completed', 'failed')`,
+    ),
+    check(
+      'spotify_library_syncs_sync_kind_valid',
+      sql`${table.syncKind} in ('full', 'incremental')`,
+    ),
+    check(
+      'spotify_library_syncs_result_code_valid',
+      sql`${table.resultCode} is null or ${table.resultCode} in ('applied', 'no_changes', 'full_sync_required')`,
     ),
     check('spotify_library_syncs_next_offset_non_negative', sql`${table.nextOffset} >= 0`),
     check(

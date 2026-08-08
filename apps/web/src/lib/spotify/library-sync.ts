@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import type { SpotifySession } from '@/lib/auth/session';
 import { withDatabase } from '@/lib/db/client';
+import type { Database } from '@/lib/db/client';
 import {
   spotifyAlbums,
   spotifyArtists,
@@ -28,6 +29,8 @@ export type FullLibrarySyncFailureCode =
   | 'temporarily_unavailable'
   | 'database_failure'
   | 'unexpected_failure';
+
+export type FullLibrarySyncRequestCode = FullLibrarySyncFailureCode | 'sync_in_progress';
 
 export type FullLibrarySyncStatus = 'running' | 'completed' | 'failed';
 
@@ -59,7 +62,7 @@ export interface SafeFullLibrarySyncState {
 
 export class FullLibrarySyncError extends Error {
   constructor(
-    public readonly code: FullLibrarySyncFailureCode,
+    public readonly code: FullLibrarySyncRequestCode,
     public readonly retryAfter: number | null = null,
   ) {
     super('Full library synchronization could not continue.');
@@ -221,7 +224,69 @@ export function prepareFullLibraryPage(
   };
 }
 
-function classifyFailure(error: unknown): FullLibrarySyncError {
+export async function persistPreparedLibraryItems(
+  transaction: Parameters<Parameters<Database['transaction']>[0]>[0],
+  prepared: ReturnType<typeof prepareFullLibraryPage>,
+  now: Date,
+): Promise<void> {
+  const { albums, artists, tracks } = prepared;
+  if (albums.length > 0) {
+    await transaction
+      .insert(spotifyAlbums)
+      .values(albums)
+      .onConflictDoUpdate({
+        target: spotifyAlbums.id,
+        set: { imageUrl: sql`excluded.image_url`, name: sql`excluded.name`, updatedAt: now },
+      });
+  }
+  if (artists.length > 0) {
+    await transaction
+      .insert(spotifyArtists)
+      .values(artists)
+      .onConflictDoUpdate({
+        target: spotifyArtists.id,
+        set: { name: sql`excluded.name`, updatedAt: now },
+      });
+  }
+  if (tracks.length === 0) return;
+  await transaction
+    .insert(spotifyTracks)
+    .values(tracks)
+    .onConflictDoUpdate({
+      target: spotifyTracks.id,
+      set: {
+        albumId: sql`excluded.album_id`,
+        durationMs: sql`excluded.duration_ms`,
+        explicit: sql`excluded.explicit`,
+        name: sql`excluded.name`,
+        spotifyUrl: sql`excluded.spotify_url`,
+        updatedAt: now,
+      },
+    });
+  const trackIds = tracks.map((track) => track.id);
+  await transaction
+    .delete(spotifyTrackArtists)
+    .where(inArray(spotifyTrackArtists.trackId, trackIds));
+  if (prepared.relationships.length > 0) {
+    await transaction
+      .insert(spotifyTrackArtists)
+      .values(prepared.relationships)
+      .onConflictDoNothing();
+  }
+  await transaction
+    .insert(userSavedTracks)
+    .values(prepared.memberships)
+    .onConflictDoUpdate({
+      target: [userSavedTracks.userId, userSavedTracks.trackId],
+      set: {
+        lastSeenSyncId: sql`excluded.last_seen_sync_id`,
+        savedAt: sql`excluded.saved_at`,
+        updatedAt: now,
+      },
+    });
+}
+
+export function classifyLibrarySyncFailure(error: unknown): FullLibrarySyncError {
   if (error instanceof FullLibrarySyncError) {
     return error;
   }
@@ -251,6 +316,7 @@ async function recordFailure(
   spotifyAccountId: string,
   failure: FullLibrarySyncError,
 ): Promise<void> {
+  if (failure.code === 'sync_in_progress') return;
   try {
     await withDatabase(async (database) => {
       const [user] = await database
@@ -304,8 +370,10 @@ export async function processFullLibrarySyncChunk(
         if (!sync) {
           [sync] = await transaction
             .insert(spotifyLibrarySyncs)
-            .values({ userId: user.id })
+            .values({ syncKind: 'full', userId: user.id })
             .returning();
+        } else if (sync.syncKind !== 'full') {
+          throw new FullLibrarySyncError('sync_in_progress');
         }
 
         if (!sync) throw new FullLibrarySyncError('database_failure');
@@ -326,68 +394,7 @@ export async function processFullLibrarySyncChunk(
           });
           const now = new Date();
           const prepared = prepareFullLibraryPage(page.items, sync.id, user.id, now);
-          const { albums, artists, tracks } = prepared;
-
-          if (albums.length > 0) {
-            await transaction
-              .insert(spotifyAlbums)
-              .values(albums)
-              .onConflictDoUpdate({
-                target: spotifyAlbums.id,
-                set: {
-                  imageUrl: sql`excluded.image_url`,
-                  name: sql`excluded.name`,
-                  updatedAt: now,
-                },
-              });
-          }
-          if (artists.length > 0) {
-            await transaction
-              .insert(spotifyArtists)
-              .values(artists)
-              .onConflictDoUpdate({
-                target: spotifyArtists.id,
-                set: { name: sql`excluded.name`, updatedAt: now },
-              });
-          }
-          if (tracks.length > 0) {
-            await transaction
-              .insert(spotifyTracks)
-              .values(tracks)
-              .onConflictDoUpdate({
-                target: spotifyTracks.id,
-                set: {
-                  albumId: sql`excluded.album_id`,
-                  durationMs: sql`excluded.duration_ms`,
-                  explicit: sql`excluded.explicit`,
-                  name: sql`excluded.name`,
-                  spotifyUrl: sql`excluded.spotify_url`,
-                  updatedAt: now,
-                },
-              });
-            const trackIds = tracks.map((track) => track.id);
-            await transaction
-              .delete(spotifyTrackArtists)
-              .where(inArray(spotifyTrackArtists.trackId, trackIds));
-            const relationships = prepared.relationships;
-            if (relationships.length > 0) {
-              await transaction
-                .insert(spotifyTrackArtists)
-                .values(relationships)
-                .onConflictDoNothing();
-            }
-            await transaction
-              .insert(userSavedTracks)
-              .values(prepared.memberships)
-              .onConflictDoUpdate({
-                target: [userSavedTracks.userId, userSavedTracks.trackId],
-                set: {
-                  lastSeenSyncId: sync.id,
-                  savedAt: sql`excluded.saved_at`,
-                  updatedAt: now,
-                },
-              });
-          }
+          await persistPreparedLibraryItems(transaction, prepared, now);
 
           const nextOffset = page.offset + page.items.length;
           processedTrackCount += page.items.length;
@@ -420,7 +427,13 @@ export async function processFullLibrarySyncChunk(
             );
           await transaction
             .update(spotifyLibrarySyncs)
-            .set({ completedAt: now, failureCode: null, status: 'completed', updatedAt: now })
+            .set({
+              completedAt: now,
+              failureCode: null,
+              resultCode: 'applied',
+              status: 'completed',
+              updatedAt: now,
+            })
             .where(
               and(eq(spotifyLibrarySyncs.id, sync.id), eq(spotifyLibrarySyncs.status, 'running')),
             );
@@ -468,7 +481,7 @@ export async function processFullLibrarySyncChunk(
       }),
     );
   } catch (error) {
-    const failure = classifyFailure(error);
+    const failure = classifyLibrarySyncFailure(error);
     await recordFailure(session.accountId, failure);
     throw failure;
   }
