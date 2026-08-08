@@ -64,8 +64,7 @@ export function MoodDistributionCard() {
         </div>
 
         <figcaption className="mt-6 border-t border-border-subtle pt-4 text-body-sm text-text-secondary">
-          No mood values are calculated yet. This feature requires full-library and audio analysis
-          in a later milestone.
+          No mood values are calculated yet. Mood analysis will be implemented in a later milestone.
         </figcaption>
       </figure>
     </Card>

@@ -12,15 +12,15 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ dataStatus, profile }: DashboardHeaderProps) {
-  const authorizationExpired = dataStatus === 'authorization_expired';
+  const libraryAvailable = dataStatus === 'success';
 
   return (
     <header className="flex flex-col gap-5">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Badge tone={authorizationExpired ? 'yellow' : 'green'}>
-              {authorizationExpired ? 'Reconnect required' : 'Spotify session active'}
+            <Badge tone={libraryAvailable ? 'green' : 'yellow'}>
+              {libraryAvailable ? 'Saved snapshot' : 'Synchronization needed'}
             </Badge>
             <Badge tone="neutral">Read-only overview</Badge>
           </div>
@@ -28,8 +28,8 @@ export function DashboardHeader({ dataStatus, profile }: DashboardHeaderProps) {
             Welcome back, {profile.firstName}
           </h1>
           <p className="mt-2 max-w-xl text-body text-text-secondary">
-            A truthful snapshot of your latest saved tracks, with future MuseVault features clearly
-            marked as previews.
+            Your latest synchronized library snapshot, with future MuseVault features clearly marked
+            as previews.
           </p>
           <p className="mt-2 text-caption text-text-muted lg:hidden">
             Connected Spotify profile: {profile.displayName}
@@ -80,7 +80,7 @@ export function DashboardHeader({ dataStatus, profile }: DashboardHeaderProps) {
           />
         </div>
         <p id="dashboard-search-help" className="mt-2 text-caption text-text-muted">
-          Search is disabled until MuseVault supports a complete library index.
+          Search is planned for a later milestone.
         </p>
       </div>
     </header>

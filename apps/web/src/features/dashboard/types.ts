@@ -43,7 +43,9 @@ export interface DashboardViewModel {
   profile: DashboardProfile;
   statistics: readonly DashboardStatistic[];
   recentlySaved: readonly DashboardRecentTrack[];
-  loadedTrackCount: number;
+  savedTrackCount: number;
+  lastSuccessfulSyncAt: string | null;
+  latestFullSyncAt: string;
 }
 
 export type DashboardDataState =
@@ -51,16 +53,8 @@ export type DashboardDataState =
       status: 'success';
       viewModel: DashboardViewModel;
     }
-  | {
-      status: 'authorization_expired';
-    }
-  | {
-      status: 'rate_limited';
-      retryAfter: number | null;
-    }
-  | {
-      status: 'temporarily_unavailable';
-    }
+  | { status: 'sync_required' }
+  | { status: 'sync_in_progress' }
   | {
       status: 'unexpected_failure';
     };
