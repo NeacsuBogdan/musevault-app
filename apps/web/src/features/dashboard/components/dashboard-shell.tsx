@@ -46,18 +46,21 @@ export function DashboardShell({ profile, state }: DashboardShellProps) {
               ) : (
                 <DashboardErrorState state={state} />
               )}
-              <DashboardAnalytics />
+              <DashboardAnalytics
+                analytics={state.status === 'success' ? state.viewModel.analytics : null}
+              />
               <RediscoverSection />
             </div>
           </div>
 
           <aside
-            aria-label="Recently saved tracks and future library features"
+            aria-label="Recently saved tracks and library facts"
             className="min-w-0 border-t border-border-subtle bg-sidebar/45 p-page-gutter pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-page-gutter xl:border-l xl:border-t-0"
           >
             <DashboardUtilityColumn
               className="grid grid-cols-1 gap-dashboard sm:grid-cols-2 xl:sticky xl:top-0 xl:grid-cols-1"
               recentlySaved={state.status === 'success' ? state.viewModel.recentlySaved : null}
+              analytics={state.status === 'success' ? state.viewModel.analytics : null}
             />
           </aside>
         </main>

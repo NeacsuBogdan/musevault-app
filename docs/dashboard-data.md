@@ -12,23 +12,31 @@ The transaction takes the existing per-user advisory lock briefly. A running aut
 
 ## Dashboard fields
 
-| Field                | Persisted source and scope                                       |
-| -------------------- | ---------------------------------------------------------------- |
-| Profile              | Safe display name and image from the encrypted session           |
-| Liked Songs          | Complete `user_saved_tracks` count                               |
-| Artists              | Distinct artists across the complete persisted library           |
-| Library Duration     | SQL sum of persisted track duration                              |
-| Average Track Length | Aggregate duration divided by saved count, zero-safe             |
-| Recently Saved       | Five newest persisted memberships with normalized track metadata |
+| Field                 | Persisted source and scope                                        |
+| --------------------- | ----------------------------------------------------------------- |
+| Profile               | Safe display name and image from the encrypted session            |
+| Liked Songs           | Complete `user_saved_tracks` count                                |
+| Artists               | Distinct artists across the complete persisted library            |
+| Library Duration      | SQL sum of persisted track duration                               |
+| Average Track Length  | Aggregate duration divided by saved count, zero-safe              |
+| Recently Saved        | Five newest persisted memberships with normalized track metadata  |
+| Top artists           | Five artists with the most credited tracks in the current library |
+| Top albums            | Five albums with the most tracks in the current library           |
+| Saved timeline        | Current memberships grouped by the UTC year of `saved_at`         |
+| Explicit composition  | SQL counts of explicit and non-explicit current memberships       |
+| Duration distribution | SQL counts in `<2m`, `2–3m`, `3–4m`, `4–5m`, and `5m+` buckets    |
+| Saved-date facts      | Earliest and latest `saved_at` among current memberships          |
 
-Counts, distinct artists, and duration are calculated in SQL; the application does not load the full library into memory. Recent artists retain persisted relationship order. URLs are allow-listed before presentation.
+All large-library analytics are reduced in SQL inside the same coherent dashboard transaction; the application does not load the full library into memory. Top-artist counts use distinct saved track IDs per credited artist, so a collaboration counts once for every credited artist but never twice for the same artist. Album memberships count once toward the track's persisted album. Ties are ordered deterministically by name and then Spotify ID. Recent artists retain persisted relationship order. URLs are allow-listed before presentation, including persisted top-album artwork.
 
 ## Snapshot behavior and limitations
 
 A completed full sync creates the authoritative baseline. Validated incremental syncs atomically update it; evidence of removal causes `/library` to perform full reconciliation. The dashboard never synchronizes data itself and may therefore lag behind Spotify until the user initiates synchronization.
 
-Music Evolution, Mood Distribution, Library Health, Rediscover, Time Machine, Wrapped, recommendations, and playlists remain unimplemented previews. They show no calculated user analytics. There is still no background synchronization, listening-history ingestion, recommendation engine, or playlist generation.
+The saved-library timeline describes when tracks in the **current** synchronized snapshot were saved. MuseVault does not preserve removed saved-track memberships as historical events, so this is not a complete historical library-size ledger or an all-time additions history. Earliest and latest dates have the same current-membership scope.
+
+Rediscover, Time Machine, Wrapped, recommendations, and playlists remain unimplemented previews. There is no mood inference or library-health score. There is still no background synchronization, listening-history ingestion, recommendation engine, or playlist generation.
 
 ## Manual verification
 
-Open `/dashboard` after a completed full sync and compare its complete count with `/library`. Verify Artists, Library Duration, Average Track Length, the five newest persisted tracks, artwork, and external links. Without synchronizing, confirm the snapshot remains stable; after Sync changes, refresh and confirm persisted additions appear. Also verify empty-library, initial-sync, running-full-sync, logout, and responsive layouts.
+Open `/dashboard` after a completed full sync and compare its complete count with `/library`. Verify the top artists and albums, safe artwork, saved timeline, composition, duration buckets, saved-date facts, the five newest persisted tracks, and external links. Without synchronizing, confirm the snapshot remains stable; after Sync changes, refresh and confirm persisted analytics update. Also verify empty-library, initial-sync, running-full-sync, logout, and responsive layouts.

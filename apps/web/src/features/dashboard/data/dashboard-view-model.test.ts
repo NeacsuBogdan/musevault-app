@@ -10,6 +10,22 @@ import {
 const profile = { displayName: 'Alex Morgan', imageUrl: 'https://i.scdn.co/image/profile' };
 function snapshot(overrides: Partial<PersistedDashboardInput> = {}): PersistedDashboardInput {
   return {
+    analytics: {
+      topArtists: [],
+      topAlbums: [],
+      savedTimeline: [],
+      explicitTrackCount: 0,
+      nonExplicitTrackCount: 1200,
+      durationBuckets: {
+        under2Minutes: 0,
+        twoTo3Minutes: 0,
+        threeTo4Minutes: 1200,
+        fourTo5Minutes: 0,
+        fiveMinutesOrMore: 0,
+      },
+      firstSavedAt: '2012-01-01T00:00:00.000Z',
+      latestSavedAt: '2026-08-08T12:00:00.000Z',
+    },
     lastSuccessfulSyncAt: '2026-08-08T12:00:00.000Z',
     latestFullSyncAt: '2026-08-01T12:00:00.000Z',
     recentlySaved: [],
@@ -65,6 +81,57 @@ describe('persisted dashboard view model', () => {
     const model = createDashboardViewModel(profile, snapshot({ recentlySaved: tracks }));
     expect(model.recentlySaved).toHaveLength(5);
     expect(model.recentlySaved[0]).toMatchObject({ albumImageUrl: null, spotifyUrl: null });
+  });
+
+  it('presents real analytics counts, preserves timeline values, and sanitizes album images', () => {
+    const model = createDashboardViewModel(
+      profile,
+      snapshot({
+        analytics: {
+          ...snapshot().analytics,
+          topArtists: [{ id: 'artist-1', name: 'Artist', savedTrackCount: 8 }],
+          topAlbums: [
+            { id: 'album-1', name: 'Album', imageUrl: 'https://bad.example/a', savedTrackCount: 5 },
+          ],
+          savedTimeline: [{ year: 2024, savedTrackCount: 3, cumulativeTrackCount: 3 }],
+          explicitTrackCount: 300,
+          nonExplicitTrackCount: 900,
+        },
+      }),
+    );
+    expect(model.analytics.topArtists[0]).toMatchObject({ name: 'Artist', savedTrackCount: 8 });
+    expect(model.analytics.topAlbums[0]).toMatchObject({ imageUrl: null, savedTrackCount: 5 });
+    expect(model.analytics.savedTimeline).toEqual([
+      { year: 2024, savedTrackCount: 3, cumulativeTrackCount: 3 },
+    ]);
+    expect(model.analytics.explicitPercentage).toBe(25);
+  });
+
+  it('keeps composition percentages finite for an empty library', () => {
+    const emptyAnalytics = {
+      ...snapshot().analytics,
+      nonExplicitTrackCount: 0,
+      durationBuckets: {
+        under2Minutes: 0,
+        twoTo3Minutes: 0,
+        threeTo4Minutes: 0,
+        fourTo5Minutes: 0,
+        fiveMinutesOrMore: 0,
+      },
+      firstSavedAt: null,
+      latestSavedAt: null,
+    };
+    const analytics = createDashboardViewModel(
+      profile,
+      snapshot({ savedTrackCount: 0, analytics: emptyAnalytics }),
+    ).analytics;
+    expect(
+      [
+        analytics.explicitPercentage,
+        analytics.nonExplicitPercentage,
+        ...analytics.durationBuckets.map((bucket) => bucket.percentage),
+      ].every(Number.isFinite),
+    ).toBe(true);
   });
 
   it('preserves profile fallback and safe image behavior', () => {

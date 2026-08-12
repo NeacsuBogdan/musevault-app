@@ -2,6 +2,7 @@ import type { SpotifyProfile } from '@/types/spotify';
 
 import type { PersistedDashboardSnapshot } from '@/lib/db/repositories/persisted-library';
 import type {
+  DashboardAnalyticsModel,
   DashboardProfile,
   DashboardRecentTrack,
   DashboardStatistic,
@@ -41,6 +42,54 @@ function isSafeSpotifyTrackUrl(value: string): boolean {
 function displayInteger(value: number): string {
   const safeValue = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
   return new Intl.NumberFormat('en-US').format(safeValue);
+}
+
+function safeCount(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+}
+
+function percentage(count: number, total: number): number {
+  return total > 0 ? Math.min(100, (safeCount(count) / total) * 100) : 0;
+}
+
+function toAnalytics(snapshot: PersistedDashboardInput): DashboardAnalyticsModel {
+  const savedTrackCount = safeCount(snapshot.savedTrackCount);
+  const durationBuckets = [
+    ['under2Minutes', 'Under 2 min', snapshot.analytics.durationBuckets.under2Minutes],
+    ['twoTo3Minutes', '2–3 min', snapshot.analytics.durationBuckets.twoTo3Minutes],
+    ['threeTo4Minutes', '3–4 min', snapshot.analytics.durationBuckets.threeTo4Minutes],
+    ['fourTo5Minutes', '4–5 min', snapshot.analytics.durationBuckets.fourTo5Minutes],
+    ['fiveMinutesOrMore', '5+ min', snapshot.analytics.durationBuckets.fiveMinutesOrMore],
+  ] as const;
+
+  return {
+    topArtists: snapshot.analytics.topArtists.map((artist) => ({
+      ...artist,
+      savedTrackCount: safeCount(artist.savedTrackCount),
+    })),
+    topAlbums: snapshot.analytics.topAlbums.map((album) => ({
+      ...album,
+      imageUrl: isSafeSpotifyImageUrl(album.imageUrl) ? album.imageUrl : null,
+      savedTrackCount: safeCount(album.savedTrackCount),
+    })),
+    savedTimeline: snapshot.analytics.savedTimeline.map((point) => ({
+      year: Math.trunc(point.year),
+      savedTrackCount: safeCount(point.savedTrackCount),
+      cumulativeTrackCount: safeCount(point.cumulativeTrackCount),
+    })),
+    explicitTrackCount: safeCount(snapshot.analytics.explicitTrackCount),
+    nonExplicitTrackCount: safeCount(snapshot.analytics.nonExplicitTrackCount),
+    explicitPercentage: percentage(snapshot.analytics.explicitTrackCount, savedTrackCount),
+    nonExplicitPercentage: percentage(snapshot.analytics.nonExplicitTrackCount, savedTrackCount),
+    durationBuckets: durationBuckets.map(([key, label, trackCount]) => ({
+      key,
+      label,
+      trackCount: safeCount(trackCount),
+      percentage: percentage(trackCount, savedTrackCount),
+    })),
+    firstSavedAt: snapshot.analytics.firstSavedAt,
+    latestSavedAt: snapshot.analytics.latestSavedAt,
+  };
 }
 
 export function createDashboardProfile(input: DashboardProfileInput): DashboardProfile {
@@ -122,6 +171,7 @@ export function createDashboardViewModel(
     },
   ];
   return {
+    analytics: toAnalytics(snapshot),
     profile: createDashboardProfile(profile),
     statistics,
     recentlySaved: snapshot.recentlySaved.slice(0, 5).map(toRecentTrack),

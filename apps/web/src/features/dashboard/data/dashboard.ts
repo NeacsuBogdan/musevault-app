@@ -36,7 +36,6 @@ export const desktopNavigation: readonly DashboardNavigationEntry[] = [
     label: 'Analytics',
     href: '#analytics',
     icon: 'analytics',
-    status: 'Preview',
   },
   {
     label: 'Time Machine',
@@ -62,7 +61,6 @@ export const mobileNavigation: readonly DashboardNavigationEntry[] = [
     label: 'Analytics',
     href: '#analytics',
     icon: 'analytics',
-    status: 'Preview',
   },
   {
     label: 'Rediscover',

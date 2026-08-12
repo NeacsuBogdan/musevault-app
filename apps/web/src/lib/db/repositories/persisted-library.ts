@@ -18,6 +18,21 @@ import {
 
 type DatabaseExecutor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 
+const TWO_MINUTES_MS = 120_000;
+const THREE_MINUTES_MS = 180_000;
+const FOUR_MINUTES_MS = 240_000;
+const FIVE_MINUTES_MS = 300_000;
+
+export type DurationBucket = keyof PersistedLibraryAnalytics['durationBuckets'];
+
+export function classifyTrackDuration(durationMs: number): DurationBucket {
+  if (durationMs < TWO_MINUTES_MS) return 'under2Minutes';
+  if (durationMs < THREE_MINUTES_MS) return 'twoTo3Minutes';
+  if (durationMs < FOUR_MINUTES_MS) return 'threeTo4Minutes';
+  if (durationMs < FIVE_MINUTES_MS) return 'fourTo5Minutes';
+  return 'fiveMinutesOrMore';
+}
+
 const paginationSchema = z
   .object({
     limit: z.number().int().min(1).max(100),
@@ -81,12 +96,53 @@ export interface PersistedSavedTrack {
 }
 
 export interface PersistedDashboardSnapshot {
+  analytics: PersistedLibraryAnalytics;
   lastSuccessfulSyncAt: string | null;
   latestFullSyncAt: string;
   recentlySaved: PersistedSavedTrack[];
   savedTrackCount: number;
   totalDurationMs: number;
   uniqueArtistCount: number;
+}
+
+export interface PersistedLibraryAnalytics {
+  topArtists: Array<{ id: string; name: string; savedTrackCount: number }>;
+  topAlbums: Array<{
+    id: string;
+    name: string;
+    imageUrl: string | null;
+    savedTrackCount: number;
+  }>;
+  savedTimeline: Array<{
+    year: number;
+    savedTrackCount: number;
+    cumulativeTrackCount: number;
+  }>;
+  explicitTrackCount: number;
+  nonExplicitTrackCount: number;
+  durationBuckets: {
+    under2Minutes: number;
+    twoTo3Minutes: number;
+    threeTo4Minutes: number;
+    fourTo5Minutes: number;
+    fiveMinutesOrMore: number;
+  };
+  firstSavedAt: string | null;
+  latestSavedAt: string | null;
+}
+
+interface SavedTimelineRow {
+  year: number;
+  savedTrackCount: number;
+}
+
+export function assembleSavedTimeline(rows: readonly SavedTimelineRow[]) {
+  let cumulativeTrackCount = 0;
+  return rows.map((row) => {
+    const savedTrackCount = Number(row.savedTrackCount);
+    cumulativeTrackCount += savedTrackCount;
+    return { year: Number(row.year), savedTrackCount, cumulativeTrackCount };
+  });
 }
 
 export type PersistedDashboardResult =
@@ -175,6 +231,101 @@ async function readPersistedSavedTracks(
   return assemblePersistedSavedTracks(rows);
 }
 
+async function readPersistedLibraryAnalytics(
+  database: DatabaseExecutor,
+  userId: string,
+): Promise<PersistedLibraryAnalytics> {
+  const topArtists = await database
+    .select({
+      id: spotifyArtists.id,
+      name: spotifyArtists.name,
+      savedTrackCount: sql<number>`count(distinct ${userSavedTracks.trackId})::int`,
+    })
+    .from(userSavedTracks)
+    .innerJoin(spotifyTrackArtists, eq(spotifyTrackArtists.trackId, userSavedTracks.trackId))
+    .innerJoin(spotifyArtists, eq(spotifyArtists.id, spotifyTrackArtists.artistId))
+    .where(eq(userSavedTracks.userId, userId))
+    .groupBy(spotifyArtists.id, spotifyArtists.name)
+    .orderBy(
+      desc(sql`count(distinct ${userSavedTracks.trackId})`),
+      asc(spotifyArtists.name),
+      asc(spotifyArtists.id),
+    )
+    .limit(5);
+
+  const topAlbums = await database
+    .select({
+      id: spotifyAlbums.id,
+      name: spotifyAlbums.name,
+      imageUrl: spotifyAlbums.imageUrl,
+      savedTrackCount: sql<number>`count(${userSavedTracks.trackId})::int`,
+    })
+    .from(userSavedTracks)
+    .innerJoin(spotifyTracks, eq(spotifyTracks.id, userSavedTracks.trackId))
+    .innerJoin(spotifyAlbums, eq(spotifyAlbums.id, spotifyTracks.albumId))
+    .where(eq(userSavedTracks.userId, userId))
+    .groupBy(spotifyAlbums.id, spotifyAlbums.name, spotifyAlbums.imageUrl)
+    .orderBy(
+      desc(sql`count(${userSavedTracks.trackId})`),
+      asc(spotifyAlbums.name),
+      asc(spotifyAlbums.id),
+    )
+    .limit(5);
+
+  const timelineRows = await database
+    .select({
+      year: sql<number>`extract(year from ${userSavedTracks.savedAt} at time zone 'UTC')::int`,
+      savedTrackCount: sql<number>`count(${userSavedTracks.trackId})::int`,
+    })
+    .from(userSavedTracks)
+    .where(eq(userSavedTracks.userId, userId))
+    .groupBy(sql`extract(year from ${userSavedTracks.savedAt} at time zone 'UTC')`)
+    .orderBy(asc(sql`extract(year from ${userSavedTracks.savedAt} at time zone 'UTC')`));
+
+  const [composition] = await database
+    .select({
+      explicitTrackCount: sql<number>`count(*) filter (where ${spotifyTracks.explicit})::int`,
+      nonExplicitTrackCount: sql<number>`count(*) filter (where not ${spotifyTracks.explicit})::int`,
+      under2Minutes: sql<number>`count(*) filter (where ${spotifyTracks.durationMs} < ${TWO_MINUTES_MS})::int`,
+      twoTo3Minutes: sql<number>`count(*) filter (where ${spotifyTracks.durationMs} >= ${TWO_MINUTES_MS} and ${spotifyTracks.durationMs} < ${THREE_MINUTES_MS})::int`,
+      threeTo4Minutes: sql<number>`count(*) filter (where ${spotifyTracks.durationMs} >= ${THREE_MINUTES_MS} and ${spotifyTracks.durationMs} < ${FOUR_MINUTES_MS})::int`,
+      fourTo5Minutes: sql<number>`count(*) filter (where ${spotifyTracks.durationMs} >= ${FOUR_MINUTES_MS} and ${spotifyTracks.durationMs} < ${FIVE_MINUTES_MS})::int`,
+      fiveMinutesOrMore: sql<number>`count(*) filter (where ${spotifyTracks.durationMs} >= ${FIVE_MINUTES_MS})::int`,
+      firstSavedAt: sql<Date | null>`min(${userSavedTracks.savedAt})`.mapWith(
+        userSavedTracks.savedAt,
+      ),
+      latestSavedAt: sql<Date | null>`max(${userSavedTracks.savedAt})`.mapWith(
+        userSavedTracks.savedAt,
+      ),
+    })
+    .from(userSavedTracks)
+    .innerJoin(spotifyTracks, eq(spotifyTracks.id, userSavedTracks.trackId))
+    .where(eq(userSavedTracks.userId, userId));
+
+  return {
+    topArtists: topArtists.map((artist) => ({
+      ...artist,
+      savedTrackCount: Number(artist.savedTrackCount),
+    })),
+    topAlbums: topAlbums.map((album) => ({
+      ...album,
+      savedTrackCount: Number(album.savedTrackCount),
+    })),
+    savedTimeline: assembleSavedTimeline(timelineRows),
+    explicitTrackCount: Number(composition?.explicitTrackCount ?? 0),
+    nonExplicitTrackCount: Number(composition?.nonExplicitTrackCount ?? 0),
+    durationBuckets: {
+      under2Minutes: Number(composition?.under2Minutes ?? 0),
+      twoTo3Minutes: Number(composition?.twoTo3Minutes ?? 0),
+      threeTo4Minutes: Number(composition?.threeTo4Minutes ?? 0),
+      fourTo5Minutes: Number(composition?.fourTo5Minutes ?? 0),
+      fiveMinutesOrMore: Number(composition?.fiveMinutesOrMore ?? 0),
+    },
+    firstSavedAt: composition?.firstSavedAt?.toISOString() ?? null,
+    latestSavedAt: composition?.latestSavedAt?.toISOString() ?? null,
+  };
+}
+
 export async function getPersistedDashboardSnapshot(
   spotifyAccountId: string,
 ): Promise<PersistedDashboardResult> {
@@ -241,6 +392,7 @@ export async function getPersistedDashboardSnapshot(
       return {
         status: 'success' as const,
         snapshot: {
+          analytics: await readPersistedLibraryAnalytics(transaction, user.id),
           lastSuccessfulSyncAt: connection?.lastSuccessfulSyncAt?.toISOString() ?? null,
           latestFullSyncAt: latestFullSync.completedAt.toISOString(),
           recentlySaved: await readPersistedSavedTracks(transaction, user.id, {

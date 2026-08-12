@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { assemblePersistedSavedTracks, parsePersistedLibraryPagination } from './persisted-library';
+import {
+  assemblePersistedSavedTracks,
+  assembleSavedTimeline,
+  classifyTrackDuration,
+  parsePersistedLibraryPagination,
+} from './persisted-library';
 
 describe('persisted library pagination', () => {
   it('accepts bounded pagination', () => {
@@ -14,6 +19,34 @@ describe('persisted library pagination', () => {
     expect(() => parsePersistedLibraryPagination({ limit: 101, offset: 0 })).toThrow();
     expect(() => parsePersistedLibraryPagination({ limit: 50, offset: -1 })).toThrow();
     expect(() => parsePersistedLibraryPagination({ limit: 50, offset: 0, secret: true })).toThrow();
+  });
+});
+
+describe('persisted saved-library analytics', () => {
+  it('orders reduced UTC year rows cumulatively without fabricating years', () => {
+    expect(
+      assembleSavedTimeline([
+        { year: 2022, savedTrackCount: 2 },
+        { year: 2024, savedTrackCount: 3 },
+      ]),
+    ).toEqual([
+      { year: 2022, savedTrackCount: 2, cumulativeTrackCount: 2 },
+      { year: 2024, savedTrackCount: 3, cumulativeTrackCount: 5 },
+    ]);
+  });
+
+  it('returns an empty timeline zero-safely', () => {
+    expect(assembleSavedTimeline([])).toEqual([]);
+  });
+
+  it.each([
+    [119_999, 'under2Minutes'],
+    [120_000, 'twoTo3Minutes'],
+    [180_000, 'threeTo4Minutes'],
+    [240_000, 'fourTo5Minutes'],
+    [300_000, 'fiveMinutesOrMore'],
+  ] as const)('places duration boundary %i in %s', (durationMs, expected) => {
+    expect(classifyTrackDuration(durationMs)).toBe(expected);
   });
 });
 
