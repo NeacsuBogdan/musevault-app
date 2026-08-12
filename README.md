@@ -8,10 +8,12 @@ saved-tracks library, conservative incremental synchronization with automatic fu
 access-token refresh, logout, an authenticated dashboard at `/dashboard`, real Listening Insights
 at `/listening`, a provider-derived Audio Profile at `/audio-profile`, and a Neon database foundation. The dashboard uses the complete latest
 synchronized PostgreSQL library snapshot for its real library overview and saved-library analytics;
-recommendations and playlist generation remain clearly labelled previews. See the
+the database-backed Rediscover feature at `/rediscover` ranks older current saves using only
+recorded MuseVault listening and latest Spotify affinity evidence. Playlist generation is not implemented. See the
 [database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
 [listening intelligence guide](docs/listening-intelligence.md),
 [track enrichment guide](docs/track-enrichment.md),
+[Rediscover guide](docs/rediscover.md),
 and [MuseVault design system](docs/design-system.md) for details.
 
 ## Repository structure
