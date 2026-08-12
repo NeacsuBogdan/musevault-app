@@ -6,11 +6,12 @@ saved tracks, and will eventually use that library as the basis for independent 
 The current Next.js App Router application provides secure Spotify connection, a protected
 saved-tracks library, conservative incremental synchronization with automatic full reconciliation,
 access-token refresh, logout, an authenticated dashboard at `/dashboard`, real Listening Insights
-at `/listening`, and a Neon database foundation. The dashboard uses the complete latest
+at `/listening`, a provider-derived Audio Profile at `/audio-profile`, and a Neon database foundation. The dashboard uses the complete latest
 synchronized PostgreSQL library snapshot for its real library overview and saved-library analytics;
 recommendations and playlist generation remain clearly labelled previews. See the
 [database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
 [listening intelligence guide](docs/listening-intelligence.md),
+[track enrichment guide](docs/track-enrichment.md),
 and [MuseVault design system](docs/design-system.md) for details.
 
 ## Repository structure
