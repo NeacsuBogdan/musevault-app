@@ -29,7 +29,7 @@ const spotifyImageSchema = z.object({
   url: httpsUrlSchema,
 });
 
-const spotifyArtistSchema = z.object({
+export const spotifyArtistSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
 });
@@ -40,7 +40,7 @@ const spotifyAlbumSchema = z.object({
   name: z.string(),
 });
 
-const spotifyTrackSchema = z.object({
+export const spotifyTrackSchema = z.object({
   album: spotifyAlbumSchema,
   artists: z.array(spotifyArtistSchema).min(1),
   duration_ms: z.number().int().nonnegative(),
@@ -70,5 +70,40 @@ export const spotifySavedTracksResponseSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
+const cursorValueSchema = z
+  .string()
+  .regex(/^\d+$/)
+  .transform(Number)
+  .pipe(z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER));
+const spotifyContextSchema = z.object({
+  type: z.string().min(1),
+  uri: z.string().min(1),
+  external_urls: z.object({ spotify: httpsUrlSchema }).optional(),
+});
+export const spotifyRecentlyPlayedResponseSchema = z.object({
+  items: z.array(
+    z.object({
+      track: spotifyTrackSchema,
+      played_at: z.string().datetime({ offset: true }),
+      context: spotifyContextSchema.nullable(),
+    }),
+  ),
+  cursors: z
+    .object({
+      after: cursorValueSchema.nullish(),
+      before: cursorValueSchema.nullish(),
+    })
+    .nullish(),
+  next: z.string().url().nullish(),
+});
+export const spotifyTopTracksResponseSchema = z.object({
+  items: z.array(spotifyTrackSchema).max(20),
+});
+export const spotifyTopArtistsResponseSchema = z.object({
+  items: z.array(spotifyArtistSchema).max(20),
+});
+
 export type SpotifyProfileResponse = z.infer<typeof spotifyProfileResponseSchema>;
 export type SpotifySavedTracksResponse = z.infer<typeof spotifySavedTracksResponseSchema>;
+export type SpotifyRecentlyPlayedResponse = z.infer<typeof spotifyRecentlyPlayedResponseSchema>;
+export type SpotifyTrackResponse = z.infer<typeof spotifyTrackSchema>;

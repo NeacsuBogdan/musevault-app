@@ -2,11 +2,33 @@ import 'server-only';
 
 import type { ZodType } from 'zod';
 
-import type { SavedTracksPage, SpotifyProfile } from '@/types/spotify';
+import type {
+  RecentlyPlayedPage,
+  SavedTracksPage,
+  SpotifyAffinityArtist,
+  SpotifyCatalogTrack,
+  SpotifyProfile,
+  SpotifyTopTimeRange,
+} from '@/types/spotify';
 
-import { SpotifyApiError, spotifyApiErrorFromResponse } from './errors';
-import { normalizeSpotifyProfile, normalizeSpotifySavedTracks } from './normalize';
-import { spotifyProfileResponseSchema, spotifySavedTracksResponseSchema } from './schemas';
+import {
+  sanitizeSpotifySchemaIssues,
+  SpotifyApiError,
+  spotifyApiErrorFromResponse,
+} from './errors';
+import {
+  normalizeSpotifyCatalogTrack,
+  normalizeSpotifyProfile,
+  normalizeSpotifyRecentlyPlayed,
+  normalizeSpotifySavedTracks,
+} from './normalize';
+import {
+  spotifyProfileResponseSchema,
+  spotifyRecentlyPlayedResponseSchema,
+  spotifySavedTracksResponseSchema,
+  spotifyTopArtistsResponseSchema,
+  spotifyTopTracksResponseSchema,
+} from './schemas';
 
 const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
 
@@ -28,7 +50,7 @@ async function getSpotifyJson<T>(
       redirect: 'error',
     });
   } catch {
-    throw new SpotifyApiError('unavailable', null);
+    throw new SpotifyApiError('unavailable', null, null, 'network');
   }
 
   if (!response.ok) {
@@ -40,16 +62,62 @@ async function getSpotifyJson<T>(
   try {
     payload = await response.json();
   } catch {
-    throw new SpotifyApiError('invalid_response', response.status);
+    throw new SpotifyApiError('invalid_response', response.status, null, 'json');
   }
 
   const result = schema.safeParse(payload);
 
   if (!result.success) {
-    throw new SpotifyApiError('invalid_response', response.status);
+    throw new SpotifyApiError(
+      'invalid_response',
+      response.status,
+      null,
+      'schema',
+      sanitizeSpotifySchemaIssues(result.error.issues),
+    );
   }
 
   return result.data;
+}
+
+export async function getSpotifyRecentlyPlayed(
+  accessToken: string,
+  options: { limit: number; after?: number; before?: number },
+): Promise<RecentlyPlayedPage> {
+  const params = new URLSearchParams({ limit: String(options.limit) });
+  if (options.after !== undefined) params.set('after', String(options.after));
+  if (options.before !== undefined) params.set('before', String(options.before));
+  return normalizeSpotifyRecentlyPlayed(
+    await getSpotifyJson(
+      `/me/player/recently-played?${params}`,
+      accessToken,
+      spotifyRecentlyPlayedResponseSchema,
+    ),
+  );
+}
+
+export async function getSpotifyTopTracks(
+  accessToken: string,
+  timeRange: SpotifyTopTimeRange,
+): Promise<SpotifyCatalogTrack[]> {
+  const response = await getSpotifyJson(
+    `/me/top/tracks?limit=20&time_range=${timeRange}`,
+    accessToken,
+    spotifyTopTracksResponseSchema,
+  );
+  return response.items.map(normalizeSpotifyCatalogTrack);
+}
+
+export async function getSpotifyTopArtists(
+  accessToken: string,
+  timeRange: SpotifyTopTimeRange,
+): Promise<SpotifyAffinityArtist[]> {
+  const response = await getSpotifyJson(
+    `/me/top/artists?limit=20&time_range=${timeRange}`,
+    accessToken,
+    spotifyTopArtistsResponseSchema,
+  );
+  return response.items.map(({ id, name }) => ({ id, name }));
 }
 
 export async function getSpotifyProfile(accessToken: string): Promise<SpotifyProfile> {

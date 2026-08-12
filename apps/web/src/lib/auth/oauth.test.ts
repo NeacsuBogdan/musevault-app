@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ServerEnvironment } from '@/lib/env';
 import {
+  buildSpotifyAuthorizationUrl,
   createOAuthTransaction,
   exchangeSpotifyAuthorizationCode,
+  hasRequiredSpotifyAuthorizationScopes,
   oauthValuesMatch,
   SPOTIFY_AUTHORIZATION_SCOPE,
 } from '@/lib/auth/oauth';
@@ -56,7 +58,16 @@ describe('Spotify OAuth transaction', () => {
     expect(transaction.codeChallenge).toBe(expectedChallenge);
     expect(transaction.codeVerifier).toMatch(/^[A-Za-z0-9_-]{32,128}$/);
     expect(transaction.state).toMatch(/^[A-Za-z0-9_-]{32,128}$/);
-    expect(SPOTIFY_AUTHORIZATION_SCOPE).toBe('user-library-read user-read-private');
+    expect(SPOTIFY_AUTHORIZATION_SCOPE).toBe(
+      'user-library-read user-read-private user-read-recently-played user-top-read',
+    );
+    const url = buildSpotifyAuthorizationUrl(environment, transaction);
+    expect(url.searchParams.get('scope')?.split(' ')).toEqual([
+      'user-library-read',
+      'user-read-private',
+      'user-read-recently-played',
+      'user-top-read',
+    ]);
   });
 
   it('accepts only the original well-formed state value', () => {
@@ -71,7 +82,7 @@ describe('Spotify OAuth transaction', () => {
 describe('Spotify authorization token scopes', () => {
   it('returns the scopes Spotify actually granted and removes duplicates', async () => {
     mockSuccessfulTokenResponse(
-      'user-read-private playlist-read-private user-library-read user-read-private',
+      'user-read-private user-top-read user-library-read user-read-recently-played user-read-private',
     );
 
     await expect(
@@ -79,7 +90,12 @@ describe('Spotify authorization token scopes', () => {
     ).resolves.toEqual({
       accessToken: 'access-token',
       expiresInSeconds: 3_600,
-      grantedScopes: ['user-read-private', 'playlist-read-private', 'user-library-read'],
+      grantedScopes: [
+        'user-read-private',
+        'user-top-read',
+        'user-library-read',
+        'user-read-recently-played',
+      ],
       refreshToken: 'refresh-token',
     });
   });
@@ -93,7 +109,26 @@ describe('Spotify authorization token scopes', () => {
       codeVerifier,
     );
 
-    expect(token.grantedScopes).toEqual(['user-library-read', 'user-read-private']);
+    expect(token.grantedScopes).toEqual([
+      'user-library-read',
+      'user-read-private',
+      'user-read-recently-played',
+      'user-top-read',
+    ]);
+  });
+
+  it('requires both base and listening scopes', () => {
+    const all = [
+      'user-library-read',
+      'user-read-private',
+      'user-read-recently-played',
+      'user-top-read',
+    ];
+    expect(hasRequiredSpotifyAuthorizationScopes(all)).toBe(true);
+    for (const scope of all)
+      expect(hasRequiredSpotifyAuthorizationScopes(all.filter((item) => item !== scope))).toBe(
+        false,
+      );
   });
 
   it('rejects a response missing a required granted scope', async () => {

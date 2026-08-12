@@ -8,3 +8,10 @@ export {
   userSavedTracks,
 } from './spotify-library';
 export { users } from './users';
+export {
+  spotifyListeningSyncs,
+  spotifyPlayHistory,
+  spotifyTopArtistSnapshotItems,
+  spotifyTopItemSnapshots,
+  spotifyTopTrackSnapshotItems,
+} from './spotify-listening';

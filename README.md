@@ -5,11 +5,12 @@ saved tracks, and will eventually use that library as the basis for independent 
 
 The current Next.js App Router application provides secure Spotify connection, a protected
 saved-tracks library, conservative incremental synchronization with automatic full reconciliation,
-access-token refresh, logout, an authenticated dashboard at `/dashboard`, and a Neon database
-foundation for the persistent Spotify connection. The dashboard uses the complete latest
+access-token refresh, logout, an authenticated dashboard at `/dashboard`, real Listening Insights
+at `/listening`, and a Neon database foundation. The dashboard uses the complete latest
 synchronized PostgreSQL library snapshot for its real library overview and saved-library analytics;
 recommendations and playlist generation remain clearly labelled previews. See the
 [database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
+[listening intelligence guide](docs/listening-intelligence.md),
 and [MuseVault design system](docs/design-system.md) for details.
 
 ## Repository structure
@@ -96,7 +97,7 @@ http://127.0.0.1:3000/api/auth/spotify/callback
 ```
 
 Production must use the matching HTTPS callback for its deployed origin. MuseVault requests exactly
-the `user-library-read user-read-private` scopes.
+the `user-library-read user-read-private user-read-recently-played user-top-read` scopes.
 
 Spotify Development Mode is intended for development and personal projects. New applications
 currently require the owner to have Spotify Premium, allow no more than five authorized users, and
