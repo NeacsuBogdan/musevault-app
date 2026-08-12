@@ -8,6 +8,7 @@ export {
   userSavedTracks,
 } from './spotify-library';
 export { users } from './users';
+export { trackAudioFeatures, trackEnrichmentRuns } from './track-enrichment';
 export {
   spotifyListeningSyncs,
   spotifyPlayHistory,

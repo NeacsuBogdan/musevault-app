@@ -43,6 +43,11 @@ export const desktopNavigation: readonly DashboardNavigationEntry[] = [
     icon: 'history',
   },
   {
+    label: 'Audio Profile',
+    href: '/audio-profile',
+    icon: 'music',
+  },
+  {
     label: 'Time Machine',
     icon: 'history',
     status: 'Later',
@@ -68,7 +73,7 @@ export const mobileNavigation: readonly DashboardNavigationEntry[] = [
     icon: 'analytics',
   },
   desktopNavigation[4],
-  desktopNavigation[7],
+  desktopNavigation[5],
 ].filter((item): item is DashboardNavigationEntry => item !== undefined);
 
 export const rediscoverPreviews: readonly RediscoverPreview[] = [
