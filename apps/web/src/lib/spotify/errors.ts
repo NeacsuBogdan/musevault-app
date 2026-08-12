@@ -5,6 +5,28 @@ export type SpotifyApiErrorKind =
   | 'invalid_response'
   | 'unavailable';
 
+export type SpotifyApiFailureCategory = 'http' | 'network' | 'json' | 'schema' | 'unknown';
+
+export interface SafeSpotifySchemaIssue {
+  path: string;
+  code: string;
+}
+
+export function sanitizeSpotifySchemaIssues(
+  issues: ReadonlyArray<{ path: readonly PropertyKey[]; code: string }>,
+): SafeSpotifySchemaIssue[] {
+  const unique = new Map<string, SafeSpotifySchemaIssue>();
+  for (const issue of issues) {
+    const path = issue.path
+      .map((segment) => (typeof segment === 'number' ? '*' : String(segment)))
+      .join('.');
+    const key = `${path}\u0000${issue.code}`;
+    if (!unique.has(key)) unique.set(key, { path, code: issue.code });
+    if (unique.size === 10) break;
+  }
+  return [...unique.values()];
+}
+
 const ERROR_MESSAGES: Record<SpotifyApiErrorKind, string> = {
   unauthorized: 'Spotify authorization is no longer valid.',
   forbidden: 'Spotify denied access to this resource.',
@@ -18,6 +40,8 @@ export class SpotifyApiError extends Error {
     public readonly kind: SpotifyApiErrorKind,
     public readonly status: number | null,
     public readonly retryAfter: number | null = null,
+    public readonly category: SpotifyApiFailureCategory = 'unknown',
+    public readonly schemaIssues: readonly SafeSpotifySchemaIssue[] = [],
   ) {
     super(ERROR_MESSAGES[kind]);
     this.name = 'SpotifyApiError';
@@ -38,11 +62,11 @@ export function spotifyApiErrorFromResponse(
   response: Pick<Response, 'headers' | 'status'>,
 ): SpotifyApiError {
   if (response.status === 401) {
-    return new SpotifyApiError('unauthorized', response.status);
+    return new SpotifyApiError('unauthorized', response.status, null, 'http');
   }
 
   if (response.status === 403) {
-    return new SpotifyApiError('forbidden', response.status);
+    return new SpotifyApiError('forbidden', response.status, null, 'http');
   }
 
   if (response.status === 429) {
@@ -50,8 +74,9 @@ export function spotifyApiErrorFromResponse(
       'rate_limited',
       response.status,
       parseRetryAfterSeconds(response.headers.get('retry-after')),
+      'http',
     );
   }
 
-  return new SpotifyApiError('unavailable', response.status);
+  return new SpotifyApiError('unavailable', response.status, null, 'http');
 }

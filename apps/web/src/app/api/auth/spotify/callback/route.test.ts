@@ -69,7 +69,12 @@ const profile: SpotifyProfile = {
 const token: SpotifyAuthorizationToken = {
   accessToken: 'access-token',
   expiresInSeconds: 3_600,
-  grantedScopes: ['user-library-read', 'user-read-private'],
+  grantedScopes: [
+    'user-library-read',
+    'user-read-private',
+    'user-read-recently-played',
+    'user-top-read',
+  ],
   refreshToken: 'refresh-token',
 };
 

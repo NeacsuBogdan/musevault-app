@@ -18,6 +18,26 @@ export interface SavedTrack {
   savedAt: string;
 }
 
+export type SpotifyCatalogTrack = Omit<SavedTrack, 'savedAt'>;
+
+export interface RecordedSpotifyPlay {
+  track: SpotifyCatalogTrack;
+  playedAt: string;
+  context: { type: string; uri: string; spotifyUrl: string | null } | null;
+}
+
+export interface RecentlyPlayedPage {
+  items: RecordedSpotifyPlay[];
+  cursors: { after: number | null; before: number | null };
+  hasNext: boolean;
+}
+
+export type SpotifyTopTimeRange = 'short_term' | 'medium_term' | 'long_term';
+export interface SpotifyAffinityArtist {
+  id: string;
+  name: string;
+}
+
 export interface SavedTracksPage {
   items: SavedTrack[];
   total: number;

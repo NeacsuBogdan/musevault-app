@@ -1,13 +1,11 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 
 import type { SpotifySession } from '@/lib/auth/session';
 import { withDatabase } from '@/lib/db/client';
 import type { Database } from '@/lib/db/client';
 import {
-  spotifyAlbums,
-  spotifyArtists,
   spotifyConnections,
   spotifyLibrarySyncs,
   spotifyTrackArtists,
@@ -16,6 +14,7 @@ import {
   users,
 } from '@/lib/db/schema';
 import type { SavedTrack } from '@/types/spotify';
+import { persistSpotifyCatalog, prepareSpotifyCatalog } from './catalog-persistence';
 import { parseRetryAfterSeconds, SpotifyApiError } from './errors';
 import { loadSpotifySavedTracksPage } from './saved-tracks';
 import { SpotifyTokenRefreshError } from './tokens';
@@ -174,23 +173,7 @@ export function prepareFullLibraryPage(
   now: Date,
 ) {
   return {
-    albums: deduplicateById(
-      items.map((track) => ({
-        id: track.albumId,
-        imageUrl: track.albumImageUrl,
-        name: track.albumName,
-        updatedAt: now,
-      })),
-    ),
-    artists: deduplicateById(
-      items.flatMap((track) =>
-        track.artistIds.map((id, position) => ({
-          id,
-          name: track.artistNames[position] ?? '',
-          updatedAt: now,
-        })),
-      ),
-    ),
+    ...prepareSpotifyCatalog(items, now),
     memberships: deduplicateById(
       items.map((track) => ({
         id: track.id,
@@ -207,20 +190,6 @@ export function prepareFullLibraryPage(
       updatedAt: membership.updatedAt,
       userId: membership.userId,
     })),
-    relationships: items.flatMap((track) =>
-      track.artistIds.map((artistId, position) => ({ artistId, position, trackId: track.id })),
-    ),
-    tracks: deduplicateById(
-      items.map((track) => ({
-        albumId: track.albumId,
-        durationMs: track.durationMs,
-        explicit: track.explicit,
-        id: track.id,
-        name: track.name,
-        spotifyUrl: track.spotifyUrl,
-        updatedAt: now,
-      })),
-    ),
   };
 }
 
@@ -229,50 +198,8 @@ export async function persistPreparedLibraryItems(
   prepared: ReturnType<typeof prepareFullLibraryPage>,
   now: Date,
 ): Promise<void> {
-  const { albums, artists, tracks } = prepared;
-  if (albums.length > 0) {
-    await transaction
-      .insert(spotifyAlbums)
-      .values(albums)
-      .onConflictDoUpdate({
-        target: spotifyAlbums.id,
-        set: { imageUrl: sql`excluded.image_url`, name: sql`excluded.name`, updatedAt: now },
-      });
-  }
-  if (artists.length > 0) {
-    await transaction
-      .insert(spotifyArtists)
-      .values(artists)
-      .onConflictDoUpdate({
-        target: spotifyArtists.id,
-        set: { name: sql`excluded.name`, updatedAt: now },
-      });
-  }
-  if (tracks.length === 0) return;
-  await transaction
-    .insert(spotifyTracks)
-    .values(tracks)
-    .onConflictDoUpdate({
-      target: spotifyTracks.id,
-      set: {
-        albumId: sql`excluded.album_id`,
-        durationMs: sql`excluded.duration_ms`,
-        explicit: sql`excluded.explicit`,
-        name: sql`excluded.name`,
-        spotifyUrl: sql`excluded.spotify_url`,
-        updatedAt: now,
-      },
-    });
-  const trackIds = tracks.map((track) => track.id);
-  await transaction
-    .delete(spotifyTrackArtists)
-    .where(inArray(spotifyTrackArtists.trackId, trackIds));
-  if (prepared.relationships.length > 0) {
-    await transaction
-      .insert(spotifyTrackArtists)
-      .values(prepared.relationships)
-      .onConflictDoNothing();
-  }
+  await persistSpotifyCatalog(transaction, prepared, now);
+  if (prepared.tracks.length === 0) return;
   await transaction
     .insert(userSavedTracks)
     .values(prepared.memberships)

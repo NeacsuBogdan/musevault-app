@@ -22,6 +22,13 @@
       "when": 1786183277472,
       "tag": "0002_lovely_thunderball",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786508496837,
+      "tag": "0003_ambitious_the_renegades",
+      "breakpoints": true
     }
   ]
 }

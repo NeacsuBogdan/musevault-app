@@ -1,6 +1,17 @@
-import type { SavedTrack, SavedTracksPage, SpotifyProfile } from '@/types/spotify';
+import type {
+  RecentlyPlayedPage,
+  SavedTrack,
+  SavedTracksPage,
+  SpotifyCatalogTrack,
+  SpotifyProfile,
+} from '@/types/spotify';
 
-import type { SpotifyProfileResponse, SpotifySavedTracksResponse } from './schemas';
+import type {
+  SpotifyProfileResponse,
+  SpotifyRecentlyPlayedResponse,
+  SpotifySavedTracksResponse,
+  SpotifyTrackResponse,
+} from './schemas';
 
 const SPOTIFY_IMAGE_HOST = 'i.scdn.co';
 const FALLBACK_DISPLAY_NAME = 'Spotify listener';
@@ -23,18 +34,24 @@ export function normalizeSpotifyProfile(profile: SpotifyProfileResponse): Spotif
   };
 }
 
+export function normalizeSpotifyCatalogTrack(track: SpotifyTrackResponse): SpotifyCatalogTrack {
+  return {
+    id: track.id,
+    albumId: track.album.id,
+    spotifyUrl: track.external_urls.spotify,
+    name: track.name,
+    artistIds: track.artists.map((artist) => artist.id),
+    artistNames: track.artists.map((artist) => artist.name),
+    albumName: track.album.name,
+    albumImageUrl: safeSpotifyImageUrl(track.album.images),
+    durationMs: track.duration_ms,
+    explicit: track.explicit,
+  };
+}
+
 function normalizeSavedTrack(item: SpotifySavedTracksResponse['items'][number]): SavedTrack {
   return {
-    id: item.track.id,
-    albumId: item.track.album.id,
-    spotifyUrl: item.track.external_urls.spotify,
-    name: item.track.name,
-    artistIds: item.track.artists.map((artist) => artist.id),
-    artistNames: item.track.artists.map((artist) => artist.name),
-    albumName: item.track.album.name,
-    albumImageUrl: safeSpotifyImageUrl(item.track.album.images),
-    durationMs: item.track.duration_ms,
-    explicit: item.track.explicit,
+    ...normalizeSpotifyCatalogTrack(item.track),
     savedAt: item.added_at,
   };
 }
@@ -45,5 +62,39 @@ export function normalizeSpotifySavedTracks(response: SpotifySavedTracksResponse
     total: response.total,
     limit: response.limit,
     offset: response.offset,
+  };
+}
+
+function safeContextUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  const url = new URL(value);
+  const allowed = ['/album/', '/artist/', '/playlist/', '/collection/', '/show/', '/episode/'];
+  return url.protocol === 'https:' &&
+    url.hostname === 'open.spotify.com' &&
+    allowed.some((prefix) => url.pathname.startsWith(prefix))
+    ? value
+    : null;
+}
+
+export function normalizeSpotifyRecentlyPlayed(
+  response: SpotifyRecentlyPlayedResponse,
+): RecentlyPlayedPage {
+  return {
+    items: response.items.map((item) => ({
+      track: normalizeSpotifyCatalogTrack(item.track),
+      playedAt: new Date(item.played_at).toISOString(),
+      context: item.context
+        ? {
+            type: item.context.type,
+            uri: item.context.uri,
+            spotifyUrl: safeContextUrl(item.context.external_urls?.spotify),
+          }
+        : null,
+    })),
+    cursors: {
+      after: response.cursors?.after ?? null,
+      before: response.cursors?.before ?? null,
+    },
+    hasNext: response.next != null,
   };
 }

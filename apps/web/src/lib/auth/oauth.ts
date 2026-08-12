@@ -19,8 +19,18 @@ const authorizationTokenSchema = z.object({
 
 const oauthValueSchema = z.string().regex(/^[A-Za-z0-9_-]{32,128}$/);
 
-export const SPOTIFY_AUTHORIZATION_SCOPE = 'user-library-read user-read-private';
-const REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES = SPOTIFY_AUTHORIZATION_SCOPE.split(' ');
+export const REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES = [
+  'user-library-read',
+  'user-read-private',
+  'user-read-recently-played',
+  'user-top-read',
+] as const;
+export const SPOTIFY_AUTHORIZATION_SCOPE = REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES.join(' ');
+
+export function hasRequiredSpotifyAuthorizationScopes(scopes: readonly string[]): boolean {
+  const granted = new Set(scopes);
+  return REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES.every((scope) => granted.has(scope));
+}
 
 export interface OAuthTransaction {
   codeChallenge: string;
@@ -156,7 +166,7 @@ export async function exchangeSpotifyAuthorizationCode(
     (token.data.scope ?? SPOTIFY_AUTHORIZATION_SCOPE).split(/\s+/).filter(Boolean),
   );
 
-  if (REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES.some((scope) => !grantedScopes.has(scope))) {
+  if (!hasRequiredSpotifyAuthorizationScopes([...grantedScopes])) {
     throw new SpotifyAuthorizationError('Spotify did not grant the required access.');
   }
 

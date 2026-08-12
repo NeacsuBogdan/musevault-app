@@ -38,6 +38,11 @@ export const desktopNavigation: readonly DashboardNavigationEntry[] = [
     icon: 'analytics',
   },
   {
+    label: 'Listening Insights',
+    href: '/listening',
+    icon: 'history',
+  },
+  {
     label: 'Time Machine',
     icon: 'history',
     status: 'Later',
@@ -62,13 +67,8 @@ export const mobileNavigation: readonly DashboardNavigationEntry[] = [
     href: '#analytics',
     icon: 'analytics',
   },
-  {
-    label: 'Rediscover',
-    href: '#rediscover',
-    icon: 'gem',
-    status: 'Preview',
-  },
-  desktopNavigation[6],
+  desktopNavigation[4],
+  desktopNavigation[7],
 ].filter((item): item is DashboardNavigationEntry => item !== undefined);
 
 export const rediscoverPreviews: readonly RediscoverPreview[] = [
