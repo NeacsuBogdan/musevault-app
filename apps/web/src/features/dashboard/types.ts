@@ -39,7 +39,35 @@ export interface DashboardRecentTrack {
   savedAt: string;
 }
 
+export interface DashboardAnalyticsModel {
+  topArtists: ReadonlyArray<{ id: string; name: string; savedTrackCount: number }>;
+  topAlbums: ReadonlyArray<{
+    id: string;
+    name: string;
+    imageUrl: string | null;
+    savedTrackCount: number;
+  }>;
+  savedTimeline: ReadonlyArray<{
+    year: number;
+    savedTrackCount: number;
+    cumulativeTrackCount: number;
+  }>;
+  explicitTrackCount: number;
+  nonExplicitTrackCount: number;
+  explicitPercentage: number;
+  nonExplicitPercentage: number;
+  durationBuckets: ReadonlyArray<{
+    key: string;
+    label: string;
+    trackCount: number;
+    percentage: number;
+  }>;
+  firstSavedAt: string | null;
+  latestSavedAt: string | null;
+}
+
 export interface DashboardViewModel {
+  analytics: DashboardAnalyticsModel;
   profile: DashboardProfile;
   statistics: readonly DashboardStatistic[];
   recentlySaved: readonly DashboardRecentTrack[];

@@ -1,21 +1,26 @@
 import { SectionHeader } from '@/components/ui/section-header';
 
-import { MoodDistributionCard } from './mood-distribution-card';
-import { MusicEvolutionCard } from './music-evolution-card';
+import type { DashboardAnalyticsModel } from '../types';
+import { LibraryCompositionCard } from './library-composition-card';
+import { SavedLibraryTimelineCard } from './saved-library-timeline-card';
+import { TopAlbumsCard } from './top-albums-card';
+import { TopArtistsCard } from './top-artists-card';
 
-export function DashboardAnalytics() {
+export function DashboardAnalytics({ analytics }: { analytics: DashboardAnalyticsModel | null }) {
   return (
     <section id="analytics" aria-labelledby="dashboard-analytics-title">
       <SectionHeader
         id="dashboard-analytics-title"
-        eyebrow="Product preview"
-        title="Future library analytics"
-        description="These illustrations are not calculated from your library. The analytics engine is coming later."
-        action={<span className="text-caption font-semibold text-text-muted">Coming later</span>}
+        eyebrow="Synced library"
+        title="Library analytics"
+        description="Calculated from your latest synchronized library snapshot."
+        action={<span className="text-caption font-semibold text-text-muted">Snapshot data</span>}
       />
-      <div className="mt-5 grid min-w-0 grid-cols-1 gap-dashboard min-[1360px]:grid-cols-[minmax(0,1.55fr)_minmax(17rem,0.8fr)]">
-        <MusicEvolutionCard />
-        <MoodDistributionCard />
+      <div className="mt-5 grid min-w-0 grid-cols-1 gap-dashboard min-[1360px]:grid-cols-2">
+        <SavedLibraryTimelineCard timeline={analytics?.savedTimeline ?? null} />
+        <LibraryCompositionCard analytics={analytics} />
+        <TopArtistsCard artists={analytics?.topArtists ?? null} />
+        <TopAlbumsCard albums={analytics?.topAlbums ?? null} />
       </div>
     </section>
   );

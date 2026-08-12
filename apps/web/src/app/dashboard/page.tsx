@@ -8,7 +8,7 @@ import { readSession } from '@/lib/auth/session';
 
 export const metadata: Metadata = {
   title: 'Dashboard',
-  description: 'View your synchronized Spotify library snapshot and MuseVault feature previews.',
+  description: 'View analytics calculated from your synchronized Spotify library snapshot.',
 };
 
 export const dynamic = 'force-dynamic';

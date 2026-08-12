@@ -1,17 +1,22 @@
-import type { DashboardRecentTrack } from '../types';
-import { LibraryHealthCard } from './library-health-card';
+import type { DashboardAnalyticsModel, DashboardRecentTrack } from '../types';
+import { LibraryFactsCard } from './library-facts-card';
 import { RecentlySavedCard } from './recently-saved-card';
 
 interface DashboardUtilityColumnProps {
   className?: string;
   recentlySaved: readonly DashboardRecentTrack[] | null;
+  analytics: DashboardAnalyticsModel | null;
 }
 
-export function DashboardUtilityColumn({ className, recentlySaved }: DashboardUtilityColumnProps) {
+export function DashboardUtilityColumn({
+  analytics,
+  className,
+  recentlySaved,
+}: DashboardUtilityColumnProps) {
   return (
     <div className={className}>
       <RecentlySavedCard headingId="recently-saved-title" tracks={recentlySaved} />
-      <LibraryHealthCard headingId="library-health-title" />
+      <LibraryFactsCard analytics={analytics} headingId="library-facts-title" />
     </div>
   );
 }

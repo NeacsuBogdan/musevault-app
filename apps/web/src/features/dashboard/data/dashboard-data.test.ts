@@ -18,6 +18,22 @@ const session: SpotifySession = {
   version: 1,
 };
 const snapshot = {
+  analytics: {
+    topArtists: [],
+    topAlbums: [],
+    savedTimeline: [],
+    explicitTrackCount: 0,
+    nonExplicitTrackCount: 1284,
+    durationBuckets: {
+      under2Minutes: 0,
+      twoTo3Minutes: 0,
+      threeTo4Minutes: 1284,
+      fourTo5Minutes: 0,
+      fiveMinutesOrMore: 0,
+    },
+    firstSavedAt: null,
+    latestSavedAt: null,
+  },
   lastSuccessfulSyncAt: '2026-08-08T12:00:00.000Z',
   latestFullSyncAt: '2026-08-01T12:00:00.000Z',
   recentlySaved: [],
