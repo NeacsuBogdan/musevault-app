@@ -19,8 +19,10 @@ describe('dashboard analytics copy', () => {
     expect(factsSource).not.toContain('health score');
   });
 
-  it('keeps Rediscover clearly presented as a preview', () => {
-    expect(rediscoverSource).toContain('Product preview');
-    expect(rediscoverSource).toContain('not generated from your Spotify data');
+  it('links to the real database-backed Rediscover feature', () => {
+    expect(rediscoverSource).toContain('Open Rediscover');
+    expect(rediscoverSource).toContain('signals MuseVault can actually observe');
+    expect(rediscoverSource).not.toContain('Product preview');
+    expect(rediscoverSource).not.toContain('Preview');
   });
 });
