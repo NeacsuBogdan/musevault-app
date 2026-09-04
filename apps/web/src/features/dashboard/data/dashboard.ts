@@ -26,9 +26,9 @@ export const desktopNavigation: readonly DashboardNavigationEntry[] = [
     icon: 'gem',
   },
   {
-    label: 'Playlists',
+    label: 'Smart Playlists',
+    href: '/smart-playlists',
     icon: 'playlists',
-    status: 'Later',
   },
   {
     label: 'Analytics',
