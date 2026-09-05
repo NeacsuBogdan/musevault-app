@@ -47,31 +47,6 @@ function isSafeSpotifyTrackUrl(value: string): boolean {
   }
 }
 
-function rediscoverReasons(candidate: RediscoverCandidate, now = new Date()): string[] {
-  const years = (now.getTime() - new Date(candidate.savedAt).getTime()) / (365 * 86_400_000);
-  const age =
-    years >= 5
-      ? 'Saved 5+ years ago'
-      : years >= 3
-        ? 'Saved 3+ years ago'
-        : years >= 2
-          ? 'Saved 2+ years ago'
-          : years >= 1
-            ? 'Saved 1+ year ago'
-            : `Saved ${dateFormatter.format(new Date(candidate.savedAt))}`;
-  const reasons = [age];
-  if (candidate.latestRecordedPlayAt) {
-    reasons.push(
-      `Latest MuseVault-recorded play: ${dateFormatter.format(new Date(candidate.latestRecordedPlayAt))}`,
-    );
-  } else {
-    reasons.push('No play recorded by MuseVault yet');
-  }
-  if (candidate.affinity.mediumTerm) reasons.push('In medium-term Spotify affinity');
-  if (candidate.affinity.longTerm) reasons.push('In long-term Spotify affinity');
-  return reasons;
-}
-
 const emptyCopy: Record<Exclude<RediscoverState, 'success'>, [string, string]> = {
   sync_required: ['Library sync required', 'Complete a full library sync before using Rediscover.'],
   sync_in_progress: [
@@ -85,7 +60,7 @@ const emptyCopy: Record<Exclude<RediscoverState, 'success'>, [string, string]> =
   ],
   no_candidates: [
     'No Rediscover candidates right now',
-    'Eligible tracks all have positive current-activity signals. Check back after those signals change.',
+    'Current recorded-listening and captured-affinity pressure lowered every eligible track to a zero score.',
   ],
 };
 
@@ -119,17 +94,23 @@ export default async function RediscoverPage({
         </p>
         <h1 className="mt-3 text-page-title font-semibold">Rediscover</h1>
         <p className="mt-4 max-w-3xl text-body text-text-secondary">
-          Older tracks from your saved library, surfaced using signals MuseVault can actually
-          observe.
+          An intelligent, evidence-aware ranking of older tracks that may be worth surfacing again.
         </p>
         <aside className="mt-6 max-w-4xl rounded-card border border-border-subtle bg-surface p-4 text-body-sm text-text-secondary">
-          Candidates were saved at least 90 days ago and are ranked by saved age, MuseVault-recorded
-          plays, and latest Spotify affinity snapshots. Tracks with a recorded play in the last 7
-          days or latest short-term affinity are excluded.
+          <h2 className="font-semibold text-text-primary">How Rediscover works</h2>
+          <p className="mt-2">
+            Rediscover combines library age, MuseVault-recorded listening, and captured Spotify
+            affinity, then applies deterministic diversity so one artist or album does not dominate
+            the results.
+          </p>
+          <p className="mt-2">
+            Rediscover Score measures surfacing relevance. Evidence Level reflects the mix of
+            track-specific and contextual evidence. Diversity changes the final order without
+            changing a track&apos;s raw score.
+          </p>
           <p className="mt-2 text-text-muted">
-            MuseVault only knows listening events it has recorded since listening synchronization
-            began. Missing recorded plays are not treated as proof that a track was not played on
-            Spotify.
+            MuseVault does not have complete Spotify listening history. Missing recorded plays or
+            affinity snapshots remain unknown and do not add relevance.
           </p>
         </aside>
 
@@ -243,24 +224,33 @@ function CandidateCard({ candidate }: { candidate: RediscoverCandidate }) {
         </div>
       </div>
       <div className="mt-5 border-t border-border-subtle pt-4">
-        <h3 className="text-caption font-semibold uppercase tracking-[0.12em] text-text-muted">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-pill bg-accent-green/10 px-3 py-1 text-caption font-semibold text-accent-green">
+            Rediscover Score {candidate.rediscoverScore}
+          </span>
+          <span className="rounded-pill bg-surface-hover px-3 py-1 text-caption capitalize text-text-secondary">
+            Evidence Level: {candidate.evidenceLevel}
+          </span>
+        </div>
+        {candidate.latestRecordedPlayAt ? (
+          <p className="mt-3 text-caption text-text-muted">
+            Latest MuseVault-recorded play:{' '}
+            {dateFormatter.format(new Date(candidate.latestRecordedPlayAt))}
+          </p>
+        ) : null}
+        <h3 className="mt-4 text-caption font-semibold uppercase tracking-[0.12em] text-text-muted">
           Why this track?
         </h3>
         <ul className="mt-2 flex flex-wrap gap-2">
-          {rediscoverReasons(candidate).map((reason) => (
+          {candidate.explanationReasons.map((reason) => (
             <li
-              key={reason}
+              key={reason.code}
               className="rounded-pill bg-surface-hover px-3 py-1 text-caption text-text-secondary"
             >
-              {reason}
+              {reason.text}
             </li>
           ))}
         </ul>
-        {!candidate.latestRecordedPlayAt ? (
-          <p className="mt-2 text-caption text-text-muted">
-            This only refers to MuseVault&apos;s recorded listening history.
-          </p>
-        ) : null}
       </div>
       {spotifyUrl ? (
         <a
