@@ -3,11 +3,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ExternalLink, Music2 } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import { SmartPlaylistExport } from '@/components/smart-playlist-export';
 import { readSession } from '@/lib/auth/session';
 import {
   getSmartPlaylistPreview,
   type SmartPlaylistTrack,
 } from '@/lib/db/repositories/smart-playlists';
+import { getSpotifyPlaylistExportCapability } from '@/lib/db/repositories/spotify-playlist-export';
 import { SMART_PLAYLIST_PRESETS, SMART_PLAYLIST_SORTS } from '@/lib/smart-playlists/definitions';
 
 export const metadata: Metadata = {
@@ -59,6 +61,21 @@ export default async function SmartPlaylistsPage({
   if (!session) redirect('/');
   const params = await searchParams;
   const preview = await getSmartPlaylistPreview(session.accountId, params);
+  const canExport = preview.state === 'success' && preview.tracks.length > 0;
+  const hasExportScope = canExport
+    ? await getSpotifyPlaylistExportCapability(session.accountId).catch(() => null)
+    : null;
+  const exportDefinition: Record<string, string> = {};
+  if (preview.preset) {
+    exportDefinition.preset = preview.preset;
+  } else {
+    for (const name of [...filterFields.map(([name]) => name), 'sort', 'limit']) {
+      const value = params[name];
+      if (typeof value === 'string') exportDefinition[name] = value;
+    }
+  }
+  const exportQuery = new URLSearchParams(exportDefinition).toString();
+  const returnTo = `/smart-playlists${exportQuery ? `?${exportQuery}` : ''}`;
   return (
     <main className="min-h-screen bg-page text-text-primary">
       <header className="border-b border-border-subtle bg-sidebar">
@@ -83,8 +100,8 @@ export default async function SmartPlaylistsPage({
           already cached.
         </p>
         <p className="mt-3 rounded-card border border-border-subtle bg-surface p-4 text-body-sm text-text-secondary">
-          These are MuseVault previews. Nothing is created on Spotify yet, and generating a preview
-          makes no provider or enrichment requests.
+          Spotify playlists are created only when you choose export. Generating a preview uses
+          cached library data and makes no provider or enrichment requests.
         </p>
 
         <section className="mt-8">
@@ -185,6 +202,16 @@ export default async function SmartPlaylistsPage({
           .
         </p>
         <PreviewState state={preview.state} message={preview.validation?.message} />
+        {canExport ? (
+          <SmartPlaylistExport
+            key={returnTo}
+            definition={exportDefinition}
+            initialName={`MuseVault — ${preview.preset ? SMART_PLAYLIST_PRESETS[preview.preset].displayName : 'Smart Playlist'}`}
+            hasExportScope={hasExportScope}
+            returnTo={returnTo}
+            authorizationFailed={typeof params.spotifyError === 'string'}
+          />
+        ) : null}
         {preview.tracks.length ? (
           <ol className="mt-8 space-y-3">
             {preview.tracks.map((track) => (

@@ -5,6 +5,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
 import type { ServerEnvironment } from '@/lib/env';
+import { SPOTIFY_PLAYLIST_EXPORT_SCOPE } from '@/lib/spotify/playlist-scopes';
 
 const SPOTIFY_AUTHORIZE_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -26,6 +27,14 @@ export const REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES = [
   'user-top-read',
 ] as const;
 export const SPOTIFY_AUTHORIZATION_SCOPE = REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES.join(' ');
+
+export type SpotifyAuthorizationCapability = 'playlist-export';
+
+function requestedAuthorizationScope(capability?: SpotifyAuthorizationCapability): string {
+  return capability === 'playlist-export'
+    ? `${SPOTIFY_AUTHORIZATION_SCOPE} ${SPOTIFY_PLAYLIST_EXPORT_SCOPE}`
+    : SPOTIFY_AUTHORIZATION_SCOPE;
+}
 
 export function hasRequiredSpotifyAuthorizationScopes(scopes: readonly string[]): boolean {
   const granted = new Set(scopes);
@@ -59,13 +68,15 @@ function createRandomBase64Url(byteLength: number): string {
   return randomBytes(byteLength).toString('base64url');
 }
 
-export function createOAuthTransaction(): OAuthTransaction {
+export function createOAuthTransaction(
+  capability?: SpotifyAuthorizationCapability,
+): OAuthTransaction {
   const codeVerifier = createRandomBase64Url(64);
 
   return {
     codeChallenge: createHash('sha256').update(codeVerifier, 'ascii').digest('base64url'),
     codeVerifier,
-    state: createRandomBase64Url(32),
+    state: `${capability === 'playlist-export' ? 'export_' : ''}${createRandomBase64Url(32)}`,
   };
 }
 
@@ -90,6 +101,7 @@ export function oauthValuesMatch(expected: string, received: string): boolean {
 export function buildSpotifyAuthorizationUrl(
   environment: ServerEnvironment,
   transaction: OAuthTransaction,
+  capability?: SpotifyAuthorizationCapability,
 ): URL {
   const authorizationUrl = new URL(SPOTIFY_AUTHORIZE_URL);
 
@@ -99,7 +111,7 @@ export function buildSpotifyAuthorizationUrl(
     code_challenge_method: 'S256',
     redirect_uri: environment.SPOTIFY_REDIRECT_URI,
     response_type: 'code',
-    scope: SPOTIFY_AUTHORIZATION_SCOPE,
+    scope: requestedAuthorizationScope(capability),
     state: transaction.state,
   }).toString();
 
@@ -118,6 +130,7 @@ export async function exchangeSpotifyAuthorizationCode(
   environment: ServerEnvironment,
   code: string,
   codeVerifier: string,
+  capability?: SpotifyAuthorizationCapability,
 ): Promise<SpotifyAuthorizationToken> {
   if (!code.trim() || !isValidOAuthValue(codeVerifier)) {
     throw new SpotifyAuthorizationError('Invalid authorization callback data.');
@@ -163,7 +176,7 @@ export async function exchangeSpotifyAuthorizationCode(
   }
 
   const grantedScopes = new Set(
-    (token.data.scope ?? SPOTIFY_AUTHORIZATION_SCOPE).split(/\s+/).filter(Boolean),
+    (token.data.scope ?? requestedAuthorizationScope(capability)).split(/\s+/).filter(Boolean),
   );
 
   if (!hasRequiredSpotifyAuthorizationScopes([...grantedScopes])) {

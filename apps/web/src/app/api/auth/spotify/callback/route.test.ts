@@ -1,8 +1,13 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OAUTH_CODE_VERIFIER_COOKIE_NAME, OAUTH_STATE_COOKIE_NAME } from '@/lib/auth/oauth-cookies';
-import type { SpotifyAuthorizationToken } from '@/lib/auth/oauth';
+import {
+  OAUTH_CODE_VERIFIER_COOKIE_NAME,
+  OAUTH_EXPORT_CONTEXT_COOKIE_NAME,
+  OAUTH_STATE_COOKIE_NAME,
+  setOAuthTransactionCookies,
+} from '@/lib/auth/oauth-cookies';
+import { createOAuthTransaction, type SpotifyAuthorizationToken } from '@/lib/auth/oauth';
 import type { ServerEnvironment } from '@/lib/env';
 import type { SpotifyProfile } from '@/types/spotify';
 
@@ -11,6 +16,7 @@ const callbackMocks = vi.hoisted(() => ({
   exchangeSpotifyAuthorizationCode: vi.fn(),
   getServerEnv: vi.fn(),
   getSpotifyProfile: vi.fn(),
+  readSession: vi.fn(),
   upsertSpotifyUserAndConnection: vi.fn(),
   writeSession: vi.fn(),
 }));
@@ -29,6 +35,7 @@ vi.mock('@/lib/auth/session', async (importOriginal) => {
 
   return {
     ...actual,
+    readSession: callbackMocks.readSession,
     writeSession: callbackMocks.writeSession,
   };
 });
@@ -98,6 +105,7 @@ function expectOAuthTransactionCookiesCleared(response: Response): void {
 
   expect(setCookie).toContain(`${OAUTH_STATE_COOKIE_NAME}=`);
   expect(setCookie).toContain(`${OAUTH_CODE_VERIFIER_COOKIE_NAME}=`);
+  expect(setCookie).toContain(`${OAUTH_EXPORT_CONTEXT_COOKIE_NAME}=`);
   expect(setCookie).toContain('Max-Age=0');
 }
 
@@ -106,6 +114,7 @@ beforeEach(() => {
   callbackMocks.exchangeSpotifyAuthorizationCode.mockResolvedValue(token);
   callbackMocks.getServerEnv.mockReturnValue(environment);
   callbackMocks.getSpotifyProfile.mockResolvedValue(profile);
+  callbackMocks.readSession.mockResolvedValue({ accountId: profile.accountId });
   callbackMocks.upsertSpotifyUserAndConnection.mockImplementation(async () => {
     callbackMocks.callOrder.push('persistence');
 
@@ -118,6 +127,114 @@ beforeEach(() => {
   });
   callbackMocks.writeSession.mockImplementation(async () => {
     callbackMocks.callOrder.push('session');
+  });
+});
+
+const exportReturnTo = '/smart-playlists?preset=high-energy&sort=energy-desc&limit=30';
+
+function createExportCallbackRequest(): NextRequest {
+  const transaction = createOAuthTransaction('playlist-export');
+  const response = NextResponse.json({});
+  setOAuthTransactionCookies(response, transaction, {
+    accountId: profile.accountId,
+    returnTo: exportReturnTo,
+    secret: environment.SESSION_SECRET,
+  });
+  const url = new URL('/api/auth/spotify/callback', environment.APP_URL);
+  url.searchParams.set('code', 'authorization-code');
+  url.searchParams.set('state', transaction.state);
+  return new NextRequest(url, {
+    headers: {
+      cookie: response.cookies
+        .getAll()
+        .map((cookie) => `${cookie.name}=${cookie.value}`)
+        .join('; '),
+    },
+  });
+}
+
+describe('Spotify export capability reauthorization callback', () => {
+  it('upserts the same account with granted scopes before returning to the exact preview URL', async () => {
+    const exportToken = {
+      ...token,
+      grantedScopes: [...token.grantedScopes, 'playlist-modify-private'],
+    };
+    callbackMocks.exchangeSpotifyAuthorizationCode.mockResolvedValue(exportToken);
+    const response = await GET(createExportCallbackRequest());
+
+    expect(response.headers.get('location')).toBe(`${environment.APP_URL}${exportReturnTo}`);
+    expect(callbackMocks.callOrder).toEqual(['persistence', 'session']);
+    expect(callbackMocks.upsertSpotifyUserAndConnection).toHaveBeenCalledWith({
+      displayName: profile.displayName,
+      grantedScopes: exportToken.grantedScopes,
+      imageUrl: profile.imageUrl,
+      refreshToken: exportToken.refreshToken,
+      spotifyAccountId: profile.accountId,
+    });
+    expect(callbackMocks.exchangeSpotifyAuthorizationCode).toHaveBeenCalledWith(
+      environment,
+      'authorization-code',
+      expect.any(String),
+      'playlist-export',
+    );
+    expectOAuthTransactionCookiesCleared(response);
+  });
+
+  it('rejects a different Spotify account without updating any connection or session', async () => {
+    callbackMocks.getSpotifyProfile.mockResolvedValue({ ...profile, accountId: 'other-account' });
+    const response = await GET(createExportCallbackRequest());
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('spotifyError')).toBe(
+      'authorization_failed',
+    );
+    expect(callbackMocks.upsertSpotifyUserAndConnection).not.toHaveBeenCalled();
+    expect(callbackMocks.writeSession).not.toHaveBeenCalled();
+    expectOAuthTransactionCookiesCleared(response);
+  });
+
+  it.each([null, { accountId: 'changed-session-account' }])(
+    'requires the original active MuseVault session %#',
+    async (session) => {
+      callbackMocks.readSession.mockResolvedValue(session);
+      const response = await GET(createExportCallbackRequest());
+      expect(new URL(response.headers.get('location') ?? '').pathname).toBe('/smart-playlists');
+      expect(callbackMocks.exchangeSpotifyAuthorizationCode).not.toHaveBeenCalled();
+      expect(callbackMocks.upsertSpotifyUserAndConnection).not.toHaveBeenCalled();
+      expect(callbackMocks.writeSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['missing', 'tampered'])(
+    'rejects a %s export context before token exchange',
+    async (kind) => {
+      const request = createExportCallbackRequest();
+      if (kind === 'missing') request.cookies.delete(OAUTH_EXPORT_CONTEXT_COOKIE_NAME);
+      else request.cookies.set(OAUTH_EXPORT_CONTEXT_COOKIE_NAME, 'tampered-context.signature');
+
+      const response = await GET(request);
+      expect(response.headers.get('location')).toBe(
+        `${environment.APP_URL}/?spotifyError=invalid_callback`,
+      );
+      expect(callbackMocks.exchangeSpotifyAuthorizationCode).not.toHaveBeenCalled();
+      expect(callbackMocks.upsertSpotifyUserAndConnection).not.toHaveBeenCalled();
+      expect(callbackMocks.writeSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns a denied optional permission to the same preview while preserving the existing session', async () => {
+    const request = createExportCallbackRequest();
+    request.nextUrl.searchParams.delete('code');
+    request.nextUrl.searchParams.set('error', 'access_denied');
+
+    const response = await GET(request);
+    const destination = new URL(response.headers.get('location') ?? '');
+    expect(destination.pathname).toBe('/smart-playlists');
+    expect(destination.searchParams.get('preset')).toBe('high-energy');
+    expect(destination.searchParams.get('limit')).toBe('30');
+    expect(destination.searchParams.get('spotifyError')).toBe('access_denied');
+    expect(callbackMocks.exchangeSpotifyAuthorizationCode).not.toHaveBeenCalled();
+    expect(callbackMocks.upsertSpotifyUserAndConnection).not.toHaveBeenCalled();
+    expect(callbackMocks.writeSession).not.toHaveBeenCalled();
+    expectOAuthTransactionCookiesCleared(response);
   });
 });
 

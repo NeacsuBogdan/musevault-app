@@ -9,11 +9,16 @@ access-token refresh, logout, an authenticated dashboard at `/dashboard`, real L
 at `/listening`, a provider-derived Audio Profile at `/audio-profile`, and a Neon database foundation. The dashboard uses the complete latest
 synchronized PostgreSQL library snapshot for its real library overview and saved-library analytics;
 the database-backed Rediscover feature at `/rediscover` ranks older current saves using only
-recorded MuseVault listening and latest Spotify affinity evidence. MuseVault can generate deterministic internal Smart Playlist previews from cached saved-library data; Spotify playlist creation and export are not implemented yet. See the
+recorded MuseVault listening and latest Spotify affinity evidence. MuseVault generates deterministic
+Smart Playlist previews from cached saved-library data and can export them to new Spotify playlists
+without public profile/search publication after an explicit user action and optional export
+authorization. See the
 [database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
 [listening intelligence guide](docs/listening-intelligence.md),
 [track enrichment guide](docs/track-enrichment.md),
 [Rediscover guide](docs/rediscover.md),
+[Smart Playlists guide](docs/smart-playlists.md),
+[Spotify playlist export guide](docs/spotify-playlist-export.md),
 and [MuseVault design system](docs/design-system.md) for details.
 
 ## Repository structure
@@ -99,8 +104,11 @@ redirect URI:
 http://127.0.0.1:3000/api/auth/spotify/callback
 ```
 
-Production must use the matching HTTPS callback for its deployed origin. MuseVault requests exactly
-the `user-library-read user-read-private user-read-recently-played user-top-read` scopes.
+Production must use the matching HTTPS callback for its deployed origin. Ordinary MuseVault
+authorization requests the `user-library-read user-read-private user-read-recently-played user-top-read`
+scopes. Exporting a playlist without publishing it publicly requires the optional
+`playlist-modify-private` scope, requested through the export reconnect action. Existing read access
+and Smart Playlist previews remain available without export permission.
 
 Spotify Development Mode is intended for development and personal projects. New applications
 currently require the owner to have Spotify Premium, allow no more than five authorized users, and
@@ -124,6 +132,23 @@ snapshot. The dashboard reads that persisted snapshot without calling Spotify du
 [incremental library synchronization](docs/incremental-library-sync.md) for the schema, migration
 workflow, bounded protocols, snapshot guarantees, and limitations.
 Concurrent request-time refreshes remain deduplicated within one server process.
+
+## Spotify playlist export
+
+After generating a non-empty preview at `/smart-playlists`, choose a playlist name and press
+**Create playlist on Spotify**. MuseVault regenerates the definition from the authenticated user's
+current PostgreSQL saved library, then creates the playlist using `POST /v1/me/playlists` with
+`public:false` and adds the ordered tracks using `POST /v1/playlists/{playlist_id}/items`. In Spotify
+Web API terms, this keeps the playlist off the user's public profile and search results. It does not
+provide access control: Spotify manages link access and true private access in its own clients.
+Users can change playlist access in Spotify itself. The browser supplies a definition, never the
+authoritative track IDs. Preview rendering remains database-only, and export does not request
+provider data or trigger audio-feature enrichment.
+
+If adding tracks fails after playlist creation, MuseVault reports a distinct partial failure and
+retains a validated Spotify link for inspection. Ambiguous writes are not automatically retried.
+There is no export history or definition persistence, automatic refresh, or playlist synchronization.
+See the [export guide](docs/spotify-playlist-export.md) for scope, validation, and failure behavior.
 
 ## Database commands
 

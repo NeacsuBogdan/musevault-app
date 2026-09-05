@@ -4,7 +4,7 @@ const page = fs.readFileSync(new URL('./page.tsx', import.meta.url), 'utf8');
 describe('Smart Playlists presentation', () => {
   it.each([
     'SMART PLAYLISTS',
-    'Nothing is created on Spotify yet',
+    'Spotify playlists are created only when you choose export',
     'features are unknown',
     'Enrich more tracks in Audio Profile',
     'Open in Spotify',
@@ -26,5 +26,8 @@ describe('Smart Playlists presentation', () => {
     expect(page).toContain('preview.summary.audioFeatureCount.toLocaleString()');
     expect(page).toContain('preview.summary.currentSavedTrackCount.toLocaleString()');
     expect(page).not.toContain("state === 'invalid_definition' ? 0");
+  });
+  it('does not promise Spotify client-level access control', () => {
+    expect(page).not.toContain('Create private playlist on Spotify');
   });
 });
