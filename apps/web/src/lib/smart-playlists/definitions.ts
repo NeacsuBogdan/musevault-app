@@ -109,7 +109,8 @@ export function parseSmartPlaylistInput(input: SmartPlaylistInput): ParsedSmartP
   const presetValue = input.preset;
   if (Array.isArray(presetValue)) return invalid({ preset: 'Choose exactly one preset.' });
   if (presetValue !== undefined) {
-    if (!(presetValue in SMART_PLAYLIST_PRESETS)) return invalid({ preset: 'Unknown preset.' });
+    if (!Object.hasOwn(SMART_PLAYLIST_PRESETS, presetValue))
+      return invalid({ preset: 'Unknown preset.' });
     const preset = presetValue as SmartPlaylistPreset;
     return { kind: 'definition', definition: SMART_PLAYLIST_PRESETS[preset].definition, preset };
   }

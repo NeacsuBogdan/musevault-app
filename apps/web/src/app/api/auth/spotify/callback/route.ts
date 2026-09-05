@@ -4,7 +4,9 @@ import { NextResponse } from 'next/server';
 import {
   clearOAuthTransactionCookies,
   OAUTH_CODE_VERIFIER_COOKIE_NAME,
+  OAUTH_EXPORT_CONTEXT_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
+  readOAuthExportContext,
 } from '@/lib/auth/oauth-cookies';
 import {
   exchangeSpotifyAuthorizationCode,
@@ -12,7 +14,8 @@ import {
   oauthValuesMatch,
   type SpotifyAuthorizationToken,
 } from '@/lib/auth/oauth';
-import { writeSession } from '@/lib/auth/session';
+import { getSafeOAuthReturnPath } from '@/lib/auth/oauth-return-path';
+import { readSession, writeSession } from '@/lib/auth/session';
 import { upsertSpotifyUserAndConnection } from '@/lib/db/repositories/spotify-connections';
 import { getServerEnv, type ServerEnvironment } from '@/lib/env';
 import { getSpotifyProfile } from '@/lib/spotify/client';
@@ -38,10 +41,10 @@ function getSingleQueryParameter(request: NextRequest, name: string): string | u
 
 function callbackRedirect(
   environment: ServerEnvironment,
-  pathname: '/' | '/library',
+  pathname: string,
   error?: CallbackErrorCode,
 ): NextResponse {
-  const redirectUrl = new URL(pathname, environment.APP_URL);
+  const redirectUrl = new URL(getSafeOAuthReturnPath(pathname) ?? '/', environment.APP_URL);
 
   if (error) {
     redirectUrl.searchParams.set('spotifyError', error);
@@ -83,12 +86,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return callbackRedirect(environment, '/', 'state_mismatch');
   }
 
+  const exportContextValue = request.cookies.get(OAUTH_EXPORT_CONTEXT_COOKIE_NAME)?.value;
+  const exportContext = exportContextValue
+    ? readOAuthExportContext(exportContextValue, storedState, environment.SESSION_SECRET)
+    : null;
+
+  // The purpose marker prevents a missing export cookie from becoming an ordinary login.
+  if ((storedState.startsWith('export_') || exportContextValue) && !exportContext) {
+    return callbackRedirect(environment, '/', 'invalid_callback');
+  }
+
+  const errorReturnPath = exportContext?.returnTo ?? '/';
+  if (exportContext) {
+    try {
+      const session = await readSession();
+      if (!session || session.accountId !== exportContext.accountId) {
+        return callbackRedirect(environment, errorReturnPath, 'authorization_failed');
+      }
+    } catch {
+      return callbackRedirect(environment, errorReturnPath, 'session_failed');
+    }
+  }
+
   const authorizationError = getSingleQueryParameter(request, 'error');
 
   if (authorizationError) {
     return callbackRedirect(
       environment,
-      '/',
+      errorReturnPath,
       authorizationError === 'access_denied' ? 'access_denied' : 'authorization_failed',
     );
   }
@@ -97,15 +122,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const codeVerifier = request.cookies.get(OAUTH_CODE_VERIFIER_COOKIE_NAME)?.value;
 
   if (!code || !isValidOAuthValue(codeVerifier)) {
-    return callbackRedirect(environment, '/', 'invalid_callback');
+    return callbackRedirect(environment, errorReturnPath, 'invalid_callback');
   }
 
   let token: SpotifyAuthorizationToken;
 
   try {
-    token = await exchangeSpotifyAuthorizationCode(environment, code, codeVerifier);
+    token = await exchangeSpotifyAuthorizationCode(
+      environment,
+      code,
+      codeVerifier,
+      exportContext?.capability,
+    );
   } catch {
-    return callbackRedirect(environment, '/', 'token_exchange_failed');
+    return callbackRedirect(environment, errorReturnPath, 'token_exchange_failed');
   }
 
   let profile: Awaited<ReturnType<typeof getSpotifyProfile>>;
@@ -113,7 +143,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     profile = await getSpotifyProfile(token.accessToken);
   } catch {
-    return callbackRedirect(environment, '/', 'profile_failed');
+    return callbackRedirect(environment, errorReturnPath, 'profile_failed');
+  }
+
+  if (exportContext && profile.accountId !== exportContext.accountId) {
+    return callbackRedirect(environment, errorReturnPath, 'authorization_failed');
   }
 
   try {
@@ -125,7 +159,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       spotifyAccountId: profile.accountId,
     });
   } catch {
-    return callbackRedirect(environment, '/', 'persistence_failed');
+    return callbackRedirect(environment, errorReturnPath, 'persistence_failed');
   }
 
   try {
@@ -139,8 +173,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       version: 1,
     });
 
-    return callbackRedirect(environment, '/library');
+    return callbackRedirect(environment, exportContext?.returnTo ?? '/library');
   } catch {
-    return callbackRedirect(environment, '/', 'session_failed');
+    return callbackRedirect(environment, errorReturnPath, 'session_failed');
   }
 }

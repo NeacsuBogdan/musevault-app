@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES } from '@/lib/auth/oauth';
+import { SPOTIFY_PLAYLIST_EXPORT_SCOPE } from '@/lib/spotify/playlist-scopes';
 import { SPOTIFY_TOKEN_ENCRYPTION_VERSION } from '@/lib/spotify/token-encryption';
 
 import {
@@ -198,6 +200,36 @@ describe('Spotify connection input normalization', () => {
 });
 
 describe('Spotify connections repository', () => {
+  it('adds optional playlist export permission to the same user and preserves sync metadata', async () => {
+    const store = new AtomicMemoryStore();
+    const repository = repositoryWith(store);
+    const first = await repository.upsertSpotifyUserAndConnection(
+      input({ grantedScopes: REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES }),
+    );
+    const originalConnection = store.connections.get(first.userId);
+    if (!originalConnection) throw new Error('Expected the original connection.');
+    originalConnection.lastSuccessfulSyncAt = TEST_DATE;
+
+    const reauthorized = await repository.upsertSpotifyUserAndConnection(
+      input({
+        grantedScopes: [...REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES, SPOTIFY_PLAYLIST_EXPORT_SCOPE],
+        refreshToken: 'reauthorized-refresh-token',
+      }),
+    );
+
+    expect(reauthorized.userId).toBe(first.userId);
+    expect(store.users.size).toBe(1);
+    expect(store.connections.size).toBe(1);
+    expect(store.connections.get(first.userId)).toMatchObject({
+      connectedAt: originalConnection.connectedAt,
+      lastSuccessfulSyncAt: TEST_DATE,
+      scopes: [...REQUIRED_SPOTIFY_AUTHORIZATION_SCOPES, SPOTIFY_PLAYLIST_EXPORT_SCOPE].sort(),
+      userId: first.userId,
+    });
+    expect(store.connectionWrites[1]).not.toHaveProperty('connectedAt');
+    expect(store.connectionWrites[1]).not.toHaveProperty('lastSuccessfulSyncAt');
+  });
+
   it('encrypts before one transaction and persists both records without plaintext', async () => {
     const events: string[] = [];
     const store = new AtomicMemoryStore(events);

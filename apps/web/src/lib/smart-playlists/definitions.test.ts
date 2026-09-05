@@ -56,6 +56,9 @@ describe('smart playlist input validation', () => {
     [{ limit: '10' }, 'limit'],
     [{ sort: 'random' }, 'sort'],
     [{ preset: 'mystery' }, 'preset'],
+    [{ preset: '__proto__' }, 'preset'],
+    [{ preset: 'constructor' }, 'preset'],
+    [{ preset: 'toString' }, 'preset'],
   ] as const)('rejects invalid input %#', (input, field) => {
     const result = parseSmartPlaylistInput(
       input as unknown as Record<string, string | string[] | undefined>,

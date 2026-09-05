@@ -4,6 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ServerEnvironment } from '@/lib/env';
 import {
+  hasSpotifyPlaylistExportScope,
+  SPOTIFY_PLAYLIST_EXPORT_SCOPE,
+} from '@/lib/spotify/playlist-scopes';
+import {
   buildSpotifyAuthorizationUrl,
   createOAuthTransaction,
   exchangeSpotifyAuthorizationCode,
@@ -49,6 +53,19 @@ afterEach(() => {
 });
 
 describe('Spotify OAuth transaction', () => {
+  it('requests only the optional private-playlist write scope for explicit export authorization', () => {
+    const transaction = createOAuthTransaction('playlist-export');
+    const url = buildSpotifyAuthorizationUrl(environment, transaction, 'playlist-export');
+
+    expect(transaction.state).toMatch(/^export_[A-Za-z0-9_-]+$/);
+    expect(url.searchParams.get('scope')?.split(' ')).toEqual([
+      ...SPOTIFY_AUTHORIZATION_SCOPE.split(' '),
+      SPOTIFY_PLAYLIST_EXPORT_SCOPE,
+    ]);
+    expect(url.searchParams.get('scope')).not.toContain('playlist-modify-public');
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+  });
+
   it('creates a valid S256 challenge from a random verifier', () => {
     const transaction = createOAuthTransaction();
     const expectedChallenge = createHash('sha256')
@@ -80,6 +97,56 @@ describe('Spotify OAuth transaction', () => {
 });
 
 describe('Spotify authorization token scopes', () => {
+  it('keeps playlist export optional for the existing read-scope authorization gate', () => {
+    const readScopes = SPOTIFY_AUTHORIZATION_SCOPE.split(' ');
+    expect(hasRequiredSpotifyAuthorizationScopes(readScopes)).toBe(true);
+    expect(hasSpotifyPlaylistExportScope(readScopes)).toBe(false);
+    expect(hasSpotifyPlaylistExportScope([...readScopes, SPOTIFY_PLAYLIST_EXPORT_SCOPE])).toBe(
+      true,
+    );
+    expect(hasSpotifyPlaylistExportScope(['playlist-modify-public'])).toBe(false);
+  });
+
+  it('persists the additional scope when Spotify grants export permission', async () => {
+    mockSuccessfulTokenResponse(`${SPOTIFY_AUTHORIZATION_SCOPE} ${SPOTIFY_PLAYLIST_EXPORT_SCOPE}`);
+
+    const token = await exchangeSpotifyAuthorizationCode(
+      environment,
+      'authorization-code',
+      codeVerifier,
+      'playlist-export',
+    );
+    expect(hasSpotifyPlaylistExportScope(token.grantedScopes)).toBe(true);
+  });
+
+  it('allows read-only authorization if Spotify does not grant the optional write scope', async () => {
+    mockSuccessfulTokenResponse(SPOTIFY_AUTHORIZATION_SCOPE);
+
+    const token = await exchangeSpotifyAuthorizationCode(
+      environment,
+      'authorization-code',
+      codeVerifier,
+      'playlist-export',
+    );
+    expect(hasRequiredSpotifyAuthorizationScopes(token.grantedScopes)).toBe(true);
+    expect(hasSpotifyPlaylistExportScope(token.grantedScopes)).toBe(false);
+  });
+
+  it('uses export transaction scopes when Spotify omits the scope field', async () => {
+    mockSuccessfulTokenResponse(undefined, false);
+
+    const token = await exchangeSpotifyAuthorizationCode(
+      environment,
+      'authorization-code',
+      codeVerifier,
+      'playlist-export',
+    );
+    expect(token.grantedScopes).toEqual([
+      ...SPOTIFY_AUTHORIZATION_SCOPE.split(' '),
+      SPOTIFY_PLAYLIST_EXPORT_SCOPE,
+    ]);
+  });
+
   it('returns the scopes Spotify actually granted and removes duplicates', async () => {
     mockSuccessfulTokenResponse(
       'user-read-private user-top-read user-library-read user-read-recently-played user-read-private',
