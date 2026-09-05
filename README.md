@@ -8,14 +8,16 @@ saved-tracks library, conservative incremental synchronization with automatic fu
 access-token refresh, logout, an authenticated dashboard at `/dashboard`, real Listening Insights
 at `/listening`, a provider-derived Audio Profile at `/audio-profile`, and a Neon database foundation. The dashboard uses the complete latest
 synchronized PostgreSQL library snapshot for its real library overview and saved-library analytics;
-the database-backed Rediscover feature at `/rediscover` ranks older current saves using only
-recorded MuseVault listening and latest Spotify affinity evidence. MuseVault generates deterministic
+the database-backed Rediscover v2 feature at `/rediscover` uses bounded score components, separate
+evidence semantics, and deterministic artist/album diversity to rank older current saves using only
+recorded MuseVault listening and latest captured Spotify affinity. MuseVault generates deterministic
 Smart Playlist previews from cached saved-library data and can export them to new Spotify playlists
 without public profile/search publication after an explicit user action and optional export
 authorization. See the
 [database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
 [listening intelligence guide](docs/listening-intelligence.md),
 [track enrichment guide](docs/track-enrichment.md),
+[intelligence foundation](docs/intelligence.md),
 [Rediscover guide](docs/rediscover.md),
 [Smart Playlists guide](docs/smart-playlists.md),
 [Spotify playlist export guide](docs/spotify-playlist-export.md),

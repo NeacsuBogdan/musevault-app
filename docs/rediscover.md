@@ -1,36 +1,72 @@
-# Rediscover
+# Rediscover v2
 
-Rediscover surfaces older tracks from a user's current saved-library snapshot using only persisted evidence MuseVault can truthfully observe. Rendering `/rediscover` makes no Spotify, ReccoBeats, recommendation, or AI request.
+Rediscover surfaces older tracks from the current saved-library snapshot through MuseVault's reusable intelligence foundation. Rendering `/rediscover` reads PostgreSQL only. It makes no Spotify, ReccoBeats, enrichment, recommendation, or AI request.
 
 ## Candidate universe and consistency
 
-The repository first requires a completed authoritative full-library sync. A completed zero-track sync is valid. A running full sync returns `sync_in_progress`; a missing completed baseline returns `sync_required`. The transaction takes the same per-user PostgreSQL advisory lock as the dashboard before reading the snapshot.
+The repository requires a completed authoritative full-library sync and takes the same per-user PostgreSQL advisory lock used by the dashboard. A running full sync returns `sync_in_progress`; a missing completed baseline returns `sync_required`; a completed zero-track baseline returns `empty_library`.
 
-Only rows currently present in `user_saved_tracks` can become candidates. Removed historical memberships cannot appear. A track is eligible when `saved_at <= now() - interval '90 days'`, using PostgreSQL time throughout the query.
+Only current `user_saved_tracks` rows are considered. A track becomes eligible at `saved_at <= evaluation_time - interval '90 days'`. Removed saved-library memberships are absent. If every eligible track has a bounded Rediscover Score of zero, the page returns `no_candidates`.
 
-Eligible tracks are excluded when positive evidence shows either:
+PostgreSQL performs membership filtering, recorded-play aggregation, latest-play lookup, latest-snapshot selection, component calculation, and initial score ordering. It returns at most 120 high-quality candidates. The application reranks that bounded pool for artist and album diversity and slices it into pages of 20. It never loads the whole library into Node and introduces no N+1 query.
 
-- a MuseVault-recorded play at or after `now() - interval '7 days'`; or
-- membership in the latest `short_term` Spotify Top Track snapshot.
+## Persisted signals
 
-For each time range, “latest” means the first snapshot ordered by `snapshot_date DESC`, `captured_at DESC`, then snapshot ID descending. Historical snapshots are not combined. Medium- and long-term membership affect ranking but do not exclude a track, and affinity rank is never interpreted as play count.
+For every eligible track, Rediscover v2 uses:
 
-## Exact score and ordering
+- saved timestamp and age;
+- latest MuseVault-recorded play when one exists;
+- MuseVault-recorded play counts in the last 7, 30, and 90 days;
+- membership and rank in the latest captured `short_term`, `medium_term`, and `long_term` Spotify Top Track snapshots;
+- availability of recorded-listening coverage and each affinity snapshot.
 
-Saved age contributes 50 points at 5 years, 40 at 3 years, 32 at 2 years, 24 at 1 year, 16 at 180 days, or 8 at 90 days. Boundaries are inclusive PostgreSQL interval comparisons.
+For each affinity range, the latest snapshot is selected by `snapshot_date DESC`, `captured_at DESC`, then snapshot ID descending. Historical snapshots are not combined. Rank stays a rank and is never presented as a play count.
 
-When a recorded play exists, its recency subtracts 25 points when within 30 days, 15 when within 90 days, or 5 when older. Recorded play count subtracts 2 points per event, capped at 20. Latest medium-term affinity subtracts 15 and latest long-term affinity subtracts 8. Missing recorded history contributes zero: it receives no positive bonus and is UNKNOWN, not evidence of inactivity. Scores are not clamped.
+## Rediscover Score v2
 
-Ordering is deterministic: score descending, `saved_at` ascending, then Spotify track ID ascending. Artist names use `jsonb_agg(... ORDER BY spotify_track_artists.position)`, preserving credited Spotify order. SQL applies a fixed limit of 20 and offset for the normalized `?page=` value; a separate SQL count supplies total pages.
+Rediscover Score answers: "How suitable is this track to surface again now?" The final integer is clamped to 0 through 100 and is not a percentage or a probability.
 
-Audio-feature availability has no role in eligibility or scoring. Rediscover does not trigger enrichment.
+The model starts with one positive component and subtracts five pressure components:
 
-## Summary and listening limitations
+| Component                     | Range | Behavior                                                                                   |
+| ----------------------------- | ----: | ------------------------------------------------------------------------------------------ |
+| Age relevance                 | 0-100 | Piecewise-linear between 25/35/50/65/78/90/100 at 90/180/365/730/1095/1825/2920 days.      |
+| Recorded-recency pressure     |  0-38 | 38 within 7 days, 30 within 30, 18 within 90, 10 within 180, 4 when older, 0 when unknown. |
+| Recorded-frequency pressure   |  0-30 | `6 * plays7d + 2 * plays30d + plays90d`, capped at 30.                                     |
+| Short-term affinity pressure  |  0-34 | Rank-weighted 18-34 points when present in the latest captured snapshot.                   |
+| Medium-term affinity pressure |  0-16 | Rank-weighted 8-16 points when present.                                                    |
+| Long-term affinity pressure   |   0-7 | Rank-weighted 3-7 points when present, so an old long-term favorite remains viable.        |
 
-The page reports the current saved-library count, eligible older-save count before activity filtering, final candidate count, and earliest MuseVault-recorded play when available. It also derives counts excluded by recent recorded play and short-term affinity for repository consumers.
+Age interpolation uses whole saved-age days and integer half-up rounding, preserving every anchor while distinguishing tracks between them. It clamps eligible age relevance to 25 through 100. The nested play-count formula deliberately weighs recent events more heavily and cannot grow without bound. Affinity pressure maps captured ranks 1 through 50 between each documented maximum and minimum. Missing play history, a missing snapshot, or absence from a snapshot adds no Rediscover relevance.
 
-MuseVault only knows listening events recorded since listening synchronization began. Missing recorded plays can reflect synchronization gaps or plays Spotify no longer exposes, so they are never described as “never listened,” “unplayed,” or proof of inactivity. A present timestamp is labelled “Latest MuseVault-recorded play.”
+### Difference from Rediscover v1
+
+Rediscover v1 used a single unclamped heuristic, lifetime recorded-play count, and hard exclusion for a play within seven days or short-term affinity membership. It paginated the SQL order directly.
+
+Rediscover v2 exposes independently testable bounded components, uses recent 7/30/90-day rotation, uses rank-aware pressure for all three latest affinity ranges, clamps the score to 0 through 100, separates Evidence Level and Vault Depth, and reranks a bounded pool for diversity. Strong recent activity can lower a score to zero instead of relying on a separate opaque exclusion rule.
+
+## Vault Depth and Evidence Level
+
+Vault Depth is an internal 0 through 100 measure of how deeply buried a track is in the saved library and available evidence. Its 0 through 70 library-age component now interpolates between its age anchors instead of using flat buckets. Known recorded inactivity contributes up to 15, and absence from affinity snapshots that actually exist contributes up to 15. Unknown listening history and missing snapshots add nothing. Vault Depth is not shown on the result cards and is not Rediscover Score.
+
+Evidence Level is track-aware. Contextual evidence consists of recorded-listening coverage and availability of the three latest affinity snapshots. Direct evidence consists of a recorded play for this track or its presence in a captured short-, medium-, or long-term snapshot. Context alone is never `high`: no direct evidence with full context is `medium`, one direct family is at least `medium`, and multiple direct families can be `high`. Strong direct recorded-play or short-term evidence with adequate context can also be `high`. It does not alter relevance.
+
+## Diversity and ordering
+
+Candidate scoring finishes before diversity begins. The deterministic reranker considers both capped total repetition and the previous four selected tracks. Same-album adjacency receives particularly strong pressure, recently repeated primary artists receive strong pressure, and non-primary credited artists receive milder pressure. Near-equal scores favor local variety, while a material relevance lead still wins. Ties resolve by raw Rediscover Score and Spotify track ID.
+
+The bounded pool is initially ordered by score descending, saved timestamp ascending, and track ID ascending. The complete pool receives one global reranked sequence before pages are sliced, so page boundaries preserve local diversity. Diversity changes final order and never changes the raw Rediscover Score. Credited artist IDs and names use persisted artist order.
+
+## Explanations and UI
+
+Each card shows a 0 through 100 Rediscover Score, Evidence Level, saved date, latest MuseVault-recorded play when known, and at most two structured reasons. Reasons are emitted only from supporting signals and ordered by information value: meaningful recorded-play recency, a longer-term to short-term affinity transition, direct medium/long-term affinity context, library age, then bare short-term absence as a low-evidence fallback. This avoids repeating a generic absence reason when richer track-specific evidence exists.
+
+MuseVault does not have complete Spotify listening history. Unknown play history is not described as "never played," and Rediscover does not claim the listener forgot a track. The page explains the data boundary and labels provider evidence as captured Spotify affinity.
+
+## Audio features and provider boundary
+
+Energy, valence, tempo, danceability, acousticness, and instrumentalness describe sound rather than rediscovery readiness. They do not affect Rediscover Score, Vault Depth, or Evidence Level in Milestone 4G. Rediscover does not trigger ReccoBeats enrichment.
 
 ## Current limitations
 
-Rediscover has no feedback, dismissal, impression, click, or history persistence; no shuffle or random scoring; no playlist generation or export; no recommendation API; and no AI. Existing cached audio features are intentionally omitted from the 4D UI. Results change only when the persisted library, listening history, affinity snapshots, or database time boundaries change. Milestone 4D adds no schema migration, environment variable, API key, paid provider, or Spotify scope.
+Rediscover has no feedback, dismissal, impression, click, or history persistence; no randomization; no playlist generation or export; and no complete Spotify listening history. Results change only with persisted membership, listening history, affinity snapshots, or time boundaries. Milestone 4G adds no migration, environment variable, API key, provider, or Spotify scope. See the [intelligence foundation](intelligence.md) for the reusable semantics.
