@@ -1,4 +1,4 @@
-# Listening intelligence
+# Listening capture
 
 MuseVault's Listening Insights foundation combines two Spotify sources. `GET /v1/me/player/recently-played` supplies the recent plays available at synchronization time, while `GET /v1/me/top/{type}` supplies Spotify-calculated track and artist affinity rankings. MuseVault requests exactly `user-library-read`, `user-read-private`, `user-read-recently-played`, and `user-top-read`.
 
@@ -16,6 +16,6 @@ Coverage begins at the earliest event MuseVault successfully records. Unknown ti
 
 After recent-play capture is caught up, MuseVault captures the first 20 tracks and artists for Spotify's `short_term`, `medium_term`, and `long_term` ranges. These are affinity ranks, not play counts. One effective snapshot is kept per user, UTC date, and range: another sync that day atomically replaces its ranked items, while a later UTC day creates historical snapshot data.
 
-## Scope and future operation
+## Scope and operation
 
-Milestone 4B is user-triggered only. The bounded, idempotent service can later be invoked by a background scheduler, but this milestone adds no cron, worker, queue, webhook, or background job. BPM, audio features, mood, energy, valence, recommendations, Rediscover, Wrapped, playlist generation, and AI are not part of 4B.
+Listening capture remains user-triggered only. The bounded, idempotent service could later be invoked by a background scheduler, but MuseVault currently adds no cron, worker, queue, webhook, or background job. The database-only intelligence derived from captured events is documented in the [Listening intelligence guide](listening.md). It adds no mood model, recommendation, Wrapped, Music Evolution, playlist export change, or AI.
