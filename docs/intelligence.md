@@ -1,6 +1,6 @@
 # MuseVault intelligence foundation
 
-MuseVault intelligence turns persisted library, recorded-listening, and captured-affinity facts into deterministic product features. It does not call Spotify, ReccoBeats, a recommendation service, or an AI model while ranking. Rediscover v2 is the first consumer of this foundation.
+MuseVault intelligence turns persisted library, recorded-listening, and captured-affinity facts into deterministic product features. It does not call Spotify, ReccoBeats, a recommendation service, or an AI model while ranking. Rediscover v2 and Listening Intelligence v2 are consumers of this foundation.
 
 ## Signals and scores
 
@@ -49,13 +49,33 @@ User-facing text scopes claims to "MuseVault-recorded" listening and "captured S
 The server-only module at `apps/web/src/lib/intelligence/` provides:
 
 - explicit Rediscover signal collection;
+- exact half-open current-7, previous-7, and current-30 listening-window primitives;
+- listening freshness derived from the latest successfully completed persisted sync;
 - bounded score components;
 - Evidence Level calculation;
 - Vault Depth calculation;
+- Rotation Score, recorded-share, concentration, and primary-artist momentum calculations;
 - structured, source-labelled explanation reasons;
 - deterministic diversity reranking over a bounded candidate pool.
 
-The types are music-domain types rather than a generic rules engine. Future Listening Intelligence, Audio Profile, Music Evolution, Personal Wrapped, and personalized Smart Playlist work can reuse the evidence, bounded-component, explanation, and reranking semantics without importing Rediscover UI code.
+The types are music-domain types rather than a generic rules engine. Future Audio Profile, Music Evolution, Personal Wrapped, dashboard insight, and personalized Smart Playlist work can reuse the evidence, bounded-component, listening-window, explanation, concentration, momentum, and reranking semantics without importing page UI code.
+
+## Listening intelligence
+
+Rotation Score answers: “How strongly does this track appear in MuseVault's recent recorded
+rotation?” It combines bounded recency (55 points), current-30 recorded frequency (25 points), and
+current-7 recorded frequency (20 points). It is distinct from Rediscover Score, Vault Depth,
+Evidence Level, and captured Spotify affinity. Missing events add no score.
+
+Listening Pulse derives recorded event, unique-track, unique-credited-artist, repeat-intensity, and
+top-five concentration facts from the current 30-day window. It distinguishes the earliest recorded
+event from the latest successfully completed listening sync. Recorded Momentum compares primary
+artists across equal adjacent seven-day windows only after at least 14 days of captured coverage and
+a successful refresh during current 7 days. Stale capture suppresses directional claims; a recently
+refreshed zero remains a valid recorded zero. Artist concentration and momentum use credit position
+`0`, while the unique-artist fact includes all credited artists. See
+[Listening intelligence](listening.md) for formulas, boundary semantics, freshness, and
+data-availability behavior.
 
 ## Vault Depth
 

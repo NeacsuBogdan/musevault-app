@@ -5,9 +5,12 @@ saved tracks, and will eventually use that library as the basis for independent 
 
 The current Next.js App Router application provides secure Spotify connection, a protected
 saved-tracks library, conservative incremental synchronization with automatic full reconciliation,
-access-token refresh, logout, an authenticated dashboard at `/dashboard`, real Listening Insights
-at `/listening`, a provider-derived Audio Profile at `/audio-profile`, and a Neon database foundation. The dashboard uses the complete latest
-synchronized PostgreSQL library snapshot for its real library overview and saved-library analytics;
+access-token refresh, logout, an authenticated dashboard at `/dashboard`, Listening Intelligence v2
+at `/listening`, a provider-derived Audio Profile at `/audio-profile`, and a Neon database foundation.
+The listening page uses exact database windows for Listening Pulse, a bounded Rotation Score, and
+primary-artist Recorded Momentum while keeping captured Spotify affinity separate. The dashboard
+uses the complete latest synchronized PostgreSQL library snapshot for its real library overview and
+saved-library analytics;
 the database-backed Rediscover v2 feature at `/rediscover` uses bounded score components, separate
 evidence semantics, and deterministic artist/album diversity to rank older current saves using only
 recorded MuseVault listening and latest captured Spotify affinity. MuseVault generates deterministic
@@ -15,7 +18,8 @@ Smart Playlist previews from cached saved-library data and can export them to ne
 without public profile/search publication after an explicit user action and optional export
 authorization. See the
 [database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
-[listening intelligence guide](docs/listening-intelligence.md),
+[listening capture guide](docs/listening-intelligence.md),
+[Listening Intelligence v2 guide](docs/listening.md),
 [track enrichment guide](docs/track-enrichment.md),
 [intelligence foundation](docs/intelligence.md),
 [Rediscover guide](docs/rediscover.md),

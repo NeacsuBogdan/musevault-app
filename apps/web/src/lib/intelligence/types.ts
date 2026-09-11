@@ -2,6 +2,79 @@ import 'server-only';
 
 export type EvidenceLevel = 'low' | 'medium' | 'high';
 
+export interface ListeningWindowBoundaries {
+  now: Date;
+  current7StartedAt: Date;
+  previous7StartedAt: Date;
+  current30StartedAt: Date;
+}
+
+export type ListeningComparisonWindow = 'current7' | 'previous7' | 'current30_only' | null;
+
+export interface ListeningWindowSignals {
+  current7RecordedCount: number;
+  previous7RecordedCount: number;
+  current30RecordedCount: number;
+}
+
+export type ListeningFreshnessState =
+  | 'never_synced'
+  | 'refreshed_within_current7'
+  | 'stale_for_current7';
+
+export interface RotationSignals {
+  latestRecordedPlayAt: Date | null;
+  recordedPlayCount7d: number;
+  recordedPlayCount30d: number;
+  activeRecordedDays30d: number;
+  recordedCoverageStartedAt: Date | null;
+}
+
+export type RotationComponentKey = 'recency' | 'frequency_30d' | 'frequency_7d';
+
+export interface RotationScoreComponent {
+  key: RotationComponentKey;
+  value: number;
+  range: readonly [number, number];
+}
+
+export interface RotationExplanation {
+  code:
+    | 'recorded_frequency_7d'
+    | 'latest_recorded_play_today'
+    | 'recorded_presence_days'
+    | 'recorded_frequency_30d';
+  text: string;
+  evidenceSource: 'recorded_listening';
+}
+
+export interface RotationIntelligence {
+  rotationScore: number;
+  scoreComponents: RotationScoreComponent[];
+  evidenceLevel: EvidenceLevel;
+  explanation: RotationExplanation | null;
+}
+
+export interface RecordedMomentumInput {
+  artistId: string;
+  artistName: string;
+  current7RecordedCount: number;
+  previous7RecordedCount: number;
+}
+
+export interface RecordedMomentumItem extends RecordedMomentumInput {
+  delta: number;
+}
+
+export type RecordedMomentum =
+  | { state: 'insufficient_coverage'; increased: []; decreased: [] }
+  | { state: 'stale_data'; increased: []; decreased: [] }
+  | {
+      state: 'available';
+      increased: RecordedMomentumItem[];
+      decreased: RecordedMomentumItem[];
+    };
+
 export type AffinityRange = 'shortTerm' | 'mediumTerm' | 'longTerm';
 
 export interface AffinitySignal {
