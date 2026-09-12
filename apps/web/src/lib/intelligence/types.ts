@@ -149,3 +149,49 @@ export interface DiversityCandidate {
   albumId: string;
   artistIds: string[];
 }
+
+export type BoundedSoundFeature =
+  | 'acousticness'
+  | 'danceability'
+  | 'energy'
+  | 'instrumentalness'
+  | 'liveness'
+  | 'speechiness'
+  | 'valence';
+
+export type SoundProfileAvailability = 'NO_DATA' | 'LIMITED_SAMPLE' | 'PROFILE_AVAILABLE';
+
+export type SoundCoverageQuality = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface SoundProfileCoverage {
+  currentSavedTrackCount: number;
+  audioCoveredTrackCount: number;
+  audioCoveragePercent: number | null;
+  profileAvailability: SoundProfileAvailability;
+  coverageQuality: SoundCoverageQuality;
+}
+
+export interface SoundDistribution {
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+}
+
+export type SoundCenter = Record<BoundedSoundFeature, SoundDistribution> & {
+  tempo: SoundDistribution;
+  loudness: SoundDistribution;
+};
+
+export type CompleteBoundedSoundValues = Record<BoundedSoundFeature, number>;
+
+export interface SoundDistanceReason {
+  feature: BoundedSoundFeature;
+  trackValue: number;
+  centerValue: number;
+  absoluteDifference: number;
+}
+
+export interface SoundDistanceCandidate {
+  trackId: string;
+  soundDistance: number;
+}

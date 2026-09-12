@@ -39,12 +39,12 @@ export function AudioEnrichmentButton({ hasCoverage }: { hasCoverage: boolean })
         type="button"
         disabled={working}
         onClick={() => void enrich()}
-        className="rounded-full bg-emerald-300 px-5 py-2.5 text-sm font-semibold text-zinc-950 disabled:opacity-60"
+        className="rounded-control bg-accent-green px-5 py-2.5 text-body-sm font-semibold text-page disabled:opacity-60"
       >
         {working ? 'Enriching…' : hasCoverage ? 'Enrich next batch' : 'Enrich audio features'}
       </button>
       {message ? (
-        <p role="alert" className="mt-3 max-w-md text-sm text-amber-200">
+        <p role="alert" className="mt-3 max-w-md text-body-sm text-amber-200">
           {message}
         </p>
       ) : null}

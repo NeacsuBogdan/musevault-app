@@ -12,9 +12,15 @@ Candidates are the distinct union of recorded plays, latest Top Track affinity, 
 
 ## Analytics and semantics
 
-The Audio Profile reports current saved-library coverage and averages only across available features. Missing rows are not zeros. The recorded seven-day profile is play-event weighted: a track played ten times contributes ten events. Coverage remains bounded by MuseVault's recorded listening history and does not imply complete Spotify history.
+Audio Profile v2 defines its universe as current saved-library membership intersected with available
+cached ReccoBeats rows. Cached rows for tracks no longer saved are excluded. PostgreSQL calculates
+p25, median, and p75 values without treating missing measurements as zero. The profile no longer
+mixes its saved-library sound description with recorded-listening event weights.
 
-Tempo display buckets are `< 90`, `90–119`, `120–139`, and `140+ BPM`. Provider features are numeric characteristics, not mood categories or user preferences. MuseVault does not classify tracks as happy or sad.
+Seven bounded characteristics display as percentages. Tempo remains in BPM and loudness in dB.
+Provider features are numeric characteristics, not mood categories or user preferences. MuseVault
+does not classify tracks as happy or sad. See [Audio Profile v2](audio-profile.md) for coverage
+thresholds, Sound Center, Sound Distance, ranking bounds, and empty states.
 
 The server-only saved-library filter foundation supports bounded tempo, energy, valence, danceability, acousticness, and instrumentalness ranges for future MuseVault-owned smart playlists. Milestone 4C creates no playlist UI or playlists.
 

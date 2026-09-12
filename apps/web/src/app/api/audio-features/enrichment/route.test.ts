@@ -43,10 +43,19 @@ beforeEach(() => {
 });
 describe('audio enrichment route', () => {
   it('is private/no-store and reports free provider status', async () => {
-    mocks.summary.mockResolvedValue({ candidates: 0 });
+    mocks.summary.mockResolvedValue({
+      coverage: {
+        currentSavedTrackCount: 0,
+        audioCoveredTrackCount: 0,
+        audioCoveragePercent: null,
+        profileAvailability: 'NO_DATA',
+        coverageQuality: 'LOW',
+      },
+    });
     const response = await GET();
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(await response.json()).toMatchObject({ provider: 'reccobeats', requiresApiKey: false });
+    expect(mocks.process).not.toHaveBeenCalled();
   });
   it('rejects cross-origin enrichment', async () => {
     expect((await POST(request('https://attacker.example'))).status).toBe(403);

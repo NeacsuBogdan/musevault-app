@@ -34,9 +34,21 @@ export {
   calculateRediscoverIntelligence,
   calculateVaultDepth,
 } from './scoring';
+export {
+  BOUNDED_SOUND_FEATURES,
+  buildSoundDistanceReasons,
+  calculateSoundDistance,
+  calculateSoundDistribution,
+  calculateSoundProfileCoverage,
+  rankClosestToSoundCenter,
+  rankSonicOutliers,
+  SOUND_EXPLANATION_FEATURE_ORDER,
+} from './sound';
 export type {
   AffinityRange,
   AffinitySignal,
+  BoundedSoundFeature,
+  CompleteBoundedSoundValues,
   DiversityCandidate,
   EvidenceLevel,
   IntelligenceReason,
@@ -56,6 +68,13 @@ export type {
   RotationScoreComponent,
   RotationSignals,
   ScoreComponent,
+  SoundCenter,
+  SoundCoverageQuality,
+  SoundDistanceCandidate,
+  SoundDistanceReason,
+  SoundDistribution,
+  SoundProfileAvailability,
+  SoundProfileCoverage,
   VaultDepthComponent,
   VaultDepthComponentKey,
 } from './types';

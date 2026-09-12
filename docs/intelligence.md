@@ -1,6 +1,9 @@
 # MuseVault intelligence foundation
 
-MuseVault intelligence turns persisted library, recorded-listening, and captured-affinity facts into deterministic product features. It does not call Spotify, ReccoBeats, a recommendation service, or an AI model while ranking. Rediscover v2 and Listening Intelligence v2 are consumers of this foundation.
+MuseVault intelligence turns persisted library, recorded-listening, captured-affinity, and cached
+audio-feature facts into deterministic product features. It does not call Spotify, ReccoBeats, a
+recommendation service, or an AI model while ranking. Rediscover v2, Listening Intelligence v2, and
+Audio Profile v2 are consumers of this foundation.
 
 ## Signals and scores
 
@@ -55,10 +58,27 @@ The server-only module at `apps/web/src/lib/intelligence/` provides:
 - Evidence Level calculation;
 - Vault Depth calculation;
 - Rotation Score, recorded-share, concentration, and primary-artist momentum calculations;
+- sound-profile availability and Coverage Quality classification;
+- percentile-compatible distribution calculation and seven-feature RMS Sound Distance;
+- fixed-order Sound Distance reasons and deterministic bounded sound-list ranking;
 - structured, source-labelled explanation reasons;
 - deterministic diversity reranking over a bounded candidate pool.
 
 The types are music-domain types rather than a generic rules engine. Future Audio Profile, Music Evolution, Personal Wrapped, dashboard insight, and personalized Smart Playlist work can reuse the evidence, bounded-component, listening-window, explanation, concentration, momentum, and reranking semantics without importing page UI code.
+
+## Sound intelligence
+
+Audio Profile v2 uses only current saved tracks with cached available ReccoBeats features. Profile
+availability (`NO_DATA`, `LIMITED_SAMPLE`, or `PROFILE_AVAILABLE`) depends on covered sample size;
+Coverage Quality (`LOW`, `MEDIUM`, or `HIGH`) additionally accounts for the share of the current
+saved library covered. These labels describe evidence coverage, not the quality of the music.
+
+Sound Center is the per-feature median of that covered sample. PostgreSQL also returns p25 and p75
+for the seven bounded characteristics plus tempo and loudness. Sound Distance is an equal-weight RMS
+distance from the seven bounded medians, multiplied by 100, clamped to 0–100, and rounded. Tracks
+with any missing bounded value are ineligible. Tempo and loudness retain native units for display and
+never enter Sound Distance. See [Audio Profile v2](audio-profile.md) for the exact thresholds,
+formula, deterministic lists, and data-availability states.
 
 ## Listening intelligence
 
@@ -101,4 +121,4 @@ The full bounded pool receives one global order before pagination. Page slicing 
 
 ## Current limits
 
-The foundation uses only current persisted evidence. It has no impression, dismissal, click, or feedback history and does not infer complete listening behavior. The 120-track pool bounds application memory and means Rediscover presents the highest-quality bounded selection rather than reranking an entire large library in Node. No schema migration, environment variable, API key, OAuth scope, or external provider was added for Milestone 4G.
+The foundation uses only current persisted evidence. It has no impression, dismissal, click, or feedback history and does not infer complete listening behavior. The 120-track pool bounds application memory and means Rediscover presents the highest-quality bounded selection rather than reranking an entire large library in Node. No schema migration, environment variable, API key, OAuth scope, or external provider was added for Milestone 4G or Audio Profile v2.
