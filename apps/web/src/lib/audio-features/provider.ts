@@ -37,6 +37,7 @@ export class AudioFeatureProviderError extends Error {
   constructor(
     public readonly code: AudioFeatureProviderFailureCode,
     public readonly retryAfter: number | null = null,
+    public readonly partialAvailable: readonly ProviderAudioFeatures[] = [],
   ) {
     super('Audio-feature provider request failed.');
     this.name = 'AudioFeatureProviderError';

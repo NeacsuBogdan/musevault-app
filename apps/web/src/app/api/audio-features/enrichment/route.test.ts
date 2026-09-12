@@ -31,11 +31,19 @@ const session = {
   expiresAt: 2e12,
   version: 1 as const,
 };
-const request = (origin = 'http://127.0.0.1:3000') =>
-  new NextRequest('http://127.0.0.1:3000/api/audio-features/enrichment', {
+const request = (origin = 'http://127.0.0.1:3000', body?: unknown) => {
+  const headers: Record<string, string> = {
+    host: '127.0.0.1:3000',
+    origin,
+    'sec-fetch-site': 'same-origin',
+  };
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  return new NextRequest('http://127.0.0.1:3000/api/audio-features/enrichment', {
     method: 'POST',
-    headers: { host: '127.0.0.1:3000', origin, 'sec-fetch-site': 'same-origin' },
+    headers,
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+};
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.readSession.mockResolvedValue(session);
@@ -59,6 +67,23 @@ describe('audio enrichment route', () => {
   });
   it('rejects cross-origin enrichment', async () => {
     expect((await POST(request('https://attacker.example'))).status).toBe(403);
+    expect(mocks.process).not.toHaveBeenCalled();
+  });
+  it('selects current saved-library candidates for an explicit bulk batch', async () => {
+    mocks.process.mockResolvedValue({ result: 'applied' });
+    expect((await POST(request(undefined, { scope: 'saved_library' }))).status).toBe(200);
+    expect(mocks.process).toHaveBeenCalledExactlyOnceWith('account', 'saved_library');
+  });
+  it('preserves the existing one-batch scope when no JSON body is sent', async () => {
+    mocks.process.mockResolvedValue({ result: 'no_changes' });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.process).toHaveBeenCalledExactlyOnceWith('account', 'all_relevant');
+  });
+  it('rejects unsupported client authority instead of accepting track IDs', async () => {
+    expect(
+      (await POST(request(undefined, { scope: 'saved_library', trackIds: ['client-track'] })))
+        .status,
+    ).toBe(400);
     expect(mocks.process).not.toHaveBeenCalled();
   });
   it('returns safe rate limits without provider bodies', async () => {

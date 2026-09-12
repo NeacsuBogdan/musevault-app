@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import {
+  buildAudioEnrichmentStatusQuery,
   buildSoundDistanceRankingsQuery,
   buildSoundProfileQuery,
   ENRICHMENT_REQUEST_LIMIT,
@@ -11,6 +12,7 @@ import {
 const source = readFileSync(new URL('./audio-profile.ts', import.meta.url), 'utf8');
 const dialect = new PgDialect();
 const compile = (query: ReturnType<typeof buildSoundProfileQuery>) => dialect.sqlToQuery(query).sql;
+const fixedNow = new Date('2026-09-12T12:00:00.000Z');
 
 describe('audio enrichment candidate priority', () => {
   it('deduplicates recent, affinity, saved, and older-history tiers in priority order', () => {
@@ -29,6 +31,41 @@ describe('audio enrichment candidate priority', () => {
       Array.from({ length: 100 }, (_, index) => ({ id: `track-${index}` })),
     ]);
     expect(ids).toHaveLength(ENRICHMENT_REQUEST_LIMIT);
+  });
+});
+
+describe('bulk audio enrichment status SQL', () => {
+  const query = dialect.sqlToQuery(buildAudioEnrichmentStatusQuery('user-id', fixedNow));
+
+  it('counts only current saved membership and excludes stale global cache rows', () => {
+    expect(query.sql).toContain('from "user_saved_tracks" saved');
+    expect(query.sql).toContain('left join "track_audio_features" features');
+    expect(query.sql).toContain('where saved.user_id =');
+    expect(query.sql).not.toContain('spotify_play_history');
+    expect(query.sql).not.toContain('spotify_top_track_snapshot_items');
+  });
+
+  it('returns covered, currently eligible, and cooling-down counts as bounded aggregates', () => {
+    expect(query.sql).toContain("features.status = 'available'");
+    expect(query.sql).toContain('features.track_id is null');
+    expect(query.sql).toContain("features.status = 'not_found' and features.retry_after_at <=");
+    expect(query.sql).toContain("features.status = 'not_found' and features.retry_after_at >");
+    expect(query.sql.match(/count\(\*\)/g)).toHaveLength(4);
+    expect(query.params).toContain('reccobeats');
+    expect(query.params.filter((value) => value === fixedNow)).toHaveLength(2);
+  });
+
+  it('keeps saved-library selection bounded to the existing 60-candidate request limit', () => {
+    expect(ENRICHMENT_REQUEST_LIMIT).toBe(60);
+    const savedSelector = source.slice(
+      source.indexOf('export async function getSavedEnrichmentCandidates'),
+      source.indexOf('interface AudioEnrichmentStatusRow'),
+    );
+    expect(savedSelector).toContain('.limit(limit)');
+    expect(savedSelector).toContain('eq(userSavedTracks.userId, userId)');
+    expect(savedSelector).toContain('isNull(trackAudioFeatures.trackId)');
+    expect(savedSelector).toContain("eq(trackAudioFeatures.status, 'not_found')");
+    expect(savedSelector).not.toContain("eq(trackAudioFeatures.status, 'available')");
   });
 });
 

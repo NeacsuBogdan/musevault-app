@@ -36,6 +36,9 @@ const featureEnvelopeSchema = z.union([
   z.object({ content: z.array(featureSchema) }).transform((value) => value.content),
 ]);
 
+type ResolvedTrack = z.infer<typeof resolvedTrackSchema>;
+type FeatureRow = z.infer<typeof featureSchema>;
+
 type Operation = 'resolve_tracks' | 'load_audio_features';
 function retryAfter(value: string | null) {
   if (value === null || !/^\d+$/.test(value)) return null;
@@ -94,6 +97,39 @@ function spotifyIdFromHref(href: string): string | null {
   }
 }
 
+function addResolvedMappings(
+  rows: readonly ResolvedTrack[],
+  requestedSpotifyIds: ReadonlySet<string>,
+  spotifyToProvider: Map<string, string>,
+) {
+  for (const item of rows) {
+    const spotifyId = spotifyIdFromHref(item.href);
+    if (spotifyId && requestedSpotifyIds.has(spotifyId)) spotifyToProvider.set(spotifyId, item.id);
+  }
+}
+
+function addFeatureRows(
+  rows: readonly FeatureRow[],
+  requestedProviderIds: ReadonlySet<string>,
+  featuresByProvider: Map<string, FeatureRow>,
+) {
+  for (const row of rows) {
+    if (requestedProviderIds.has(row.id)) featuresByProvider.set(row.id, row);
+  }
+}
+
+function availableFeatures(
+  featuresByProvider: ReadonlyMap<string, FeatureRow>,
+  providerToSpotify: ReadonlyMap<string, string>,
+): ProviderAudioFeatures[] {
+  const available: ProviderAudioFeatures[] = [];
+  for (const [providerTrackId, row] of featuresByProvider) {
+    const spotifyTrackId = providerToSpotify.get(providerTrackId);
+    if (spotifyTrackId) available.push({ ...row, spotifyTrackId, providerTrackId });
+  }
+  return available;
+}
+
 export const reccoBeatsProvider: AudioFeatureProvider = {
   name: AUDIO_FEATURE_PROVIDER,
   async loadForSpotifyTrackIds(spotifyTrackIds) {
@@ -106,26 +142,51 @@ export const reccoBeatsProvider: AudioFeatureProvider = {
       trackEnvelopeSchema,
     );
     const spotifyToProvider = new Map<string, string>();
-    for (const item of resolved) {
-      const spotifyId = spotifyIdFromHref(item.href);
-      if (spotifyId && uniqueIds.includes(spotifyId)) spotifyToProvider.set(spotifyId, item.id);
+    addResolvedMappings(resolved, new Set(uniqueIds), spotifyToProvider);
+
+    const omittedSpotifyIds = uniqueIds.filter((id) => !spotifyToProvider.has(id));
+    if (omittedSpotifyIds.length) {
+      const confirmation = await request(
+        'resolve_tracks',
+        `/v1/track?ids=${encodeURIComponent(omittedSpotifyIds.join(','))}`,
+        trackEnvelopeSchema,
+      );
+      addResolvedMappings(confirmation, new Set(omittedSpotifyIds), spotifyToProvider);
     }
+
     const providerToSpotify = new Map(
       [...spotifyToProvider].map(([spotify, provider]) => [provider, spotify]),
     );
     const providerIds = [...providerToSpotify.keys()];
-    const features = providerIds.length
-      ? await request(
-          'load_audio_features',
-          `/v1/audio-features?ids=${encodeURIComponent(providerIds.join(','))}`,
-          featureEnvelopeSchema,
-        )
-      : [];
-    const available: ProviderAudioFeatures[] = [];
-    for (const row of features) {
-      const spotifyTrackId = providerToSpotify.get(row.id);
-      if (spotifyTrackId) available.push({ ...row, spotifyTrackId, providerTrackId: row.id });
+    const featuresByProvider = new Map<string, FeatureRow>();
+    if (providerIds.length) {
+      const features = await request(
+        'load_audio_features',
+        `/v1/audio-features?ids=${encodeURIComponent(providerIds.join(','))}`,
+        featureEnvelopeSchema,
+      );
+      addFeatureRows(features, new Set(providerIds), featuresByProvider);
+
+      const omittedProviderIds = providerIds.filter((id) => !featuresByProvider.has(id));
+      if (omittedProviderIds.length) {
+        try {
+          const confirmation = await request(
+            'load_audio_features',
+            `/v1/audio-features?ids=${encodeURIComponent(omittedProviderIds.join(','))}`,
+            featureEnvelopeSchema,
+          );
+          addFeatureRows(confirmation, new Set(omittedProviderIds), featuresByProvider);
+        } catch (error) {
+          const partialAvailable = availableFeatures(featuresByProvider, providerToSpotify);
+          if (error instanceof AudioFeatureProviderError && partialAvailable.length) {
+            throw new AudioFeatureProviderError(error.code, error.retryAfter, partialAvailable);
+          }
+          throw error;
+        }
+      }
     }
+
+    const available = availableFeatures(featuresByProvider, providerToSpotify);
     const found = new Set(available.map((item) => item.spotifyTrackId));
     return {
       available,
