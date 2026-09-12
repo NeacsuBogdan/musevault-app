@@ -1,10 +1,19 @@
 'use client';
 import { useState } from 'react';
-export function AudioEnrichmentButton({ hasCoverage }: { hasCoverage: boolean }) {
+export function AudioEnrichmentButton({
+  disabled = false,
+  hasCoverage,
+  onWorkingChange,
+}: {
+  disabled?: boolean;
+  hasCoverage: boolean;
+  onWorkingChange?: (working: boolean) => void;
+}) {
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   async function enrich() {
     setWorking(true);
+    onWorkingChange?.(true);
     setMessage(null);
     try {
       const response = await fetch('/api/audio-features/enrichment', {
@@ -31,13 +40,14 @@ export function AudioEnrichmentButton({ hasCoverage }: { hasCoverage: boolean })
       );
     } finally {
       setWorking(false);
+      onWorkingChange?.(false);
     }
   }
   return (
     <div>
       <button
         type="button"
-        disabled={working}
+        disabled={disabled || working}
         onClick={() => void enrich()}
         className="rounded-control bg-accent-green px-5 py-2.5 text-body-sm font-semibold text-page disabled:opacity-60"
       >

@@ -4,7 +4,11 @@ import {
   getAudioProfileSummary,
   resolveAudioProfileUser,
 } from '@/lib/db/repositories/audio-profile';
-import { EnrichmentError, processEnrichmentRequest } from '@/lib/audio-features/enrichment';
+import {
+  EnrichmentError,
+  processEnrichmentRequest,
+  type EnrichmentCandidateScope,
+} from '@/lib/audio-features/enrichment';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'private, no-store' };
@@ -32,6 +36,18 @@ function failure(error: unknown) {
     { status, headers: resultHeaders },
   );
 }
+
+async function readCandidateScope(request: NextRequest): Promise<EnrichmentCandidateScope | null> {
+  if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json'))
+    return 'all_relevant';
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  return body &&
+    !Array.isArray(body) &&
+    Object.keys(body).length === 1 &&
+    body.scope === 'saved_library'
+    ? 'saved_library'
+    : null;
+}
 export async function GET() {
   try {
     const session = await readSession();
@@ -55,7 +71,12 @@ export async function POST(request: NextRequest) {
     const session = await readSession();
     if (!session)
       return NextResponse.json({ error: { code: 'unauthenticated' } }, { status: 401, headers });
-    return NextResponse.json(await processEnrichmentRequest(session.accountId), { headers });
+    const candidateScope = await readCandidateScope(request);
+    if (!candidateScope)
+      return NextResponse.json({ error: { code: 'invalid_request' } }, { status: 400, headers });
+    return NextResponse.json(await processEnrichmentRequest(session.accountId, candidateScope), {
+      headers,
+    });
   } catch (error) {
     return failure(error);
   }

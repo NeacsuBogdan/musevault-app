@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { withDatabase } from '@/lib/db/client';
+import type { AudioEnrichmentStatus } from '@/lib/audio-features/contracts';
 import {
   spotifyAlbums,
   spotifyArtists,
@@ -149,6 +150,90 @@ export async function getEnrichmentCandidates(
       .orderBy(desc(sql`max(${spotifyPlayHistory.playedAt})`), asc(spotifyPlayHistory.trackId))
       .limit(limit);
     return prioritizeCandidateTrackIds([recent, top, saved, olderHistory], limit);
+  });
+}
+
+export async function getSavedEnrichmentCandidates(
+  userId: string,
+  now = new Date(),
+  limit = ENRICHMENT_REQUEST_LIMIT,
+): Promise<string[]> {
+  return withDatabase((db) =>
+    db
+      .select({ id: userSavedTracks.trackId })
+      .from(userSavedTracks)
+      .leftJoin(
+        trackAudioFeatures,
+        and(
+          eq(trackAudioFeatures.trackId, userSavedTracks.trackId),
+          eq(trackAudioFeatures.provider, RECCOBEATS_PROVIDER),
+        ),
+      )
+      .where(
+        and(
+          eq(userSavedTracks.userId, userId),
+          or(
+            isNull(trackAudioFeatures.trackId),
+            and(
+              eq(trackAudioFeatures.status, 'not_found'),
+              lte(trackAudioFeatures.retryAfterAt, now),
+            ),
+          ),
+        ),
+      )
+      .orderBy(desc(userSavedTracks.savedAt), asc(userSavedTracks.trackId))
+      .limit(limit),
+  ).then((rows) => rows.map((row) => row.id));
+}
+
+interface AudioEnrichmentStatusRow {
+  current_saved_track_count: number | string;
+  audio_covered_track_count: number | string;
+  currently_eligible_remaining_count: number | string;
+  cooling_down_count: number | string;
+}
+
+/** One bounded aggregate over current saved membership; no feature rows leave PostgreSQL. */
+export function buildAudioEnrichmentStatusQuery(userId: string, now: Date) {
+  return sql`
+    select count(*)::int as current_saved_track_count,
+      count(*) filter (
+        where features.status = 'available'
+      )::int as audio_covered_track_count,
+      count(*) filter (
+        where features.track_id is null
+          or (features.status = 'not_found' and features.retry_after_at <= ${now})
+      )::int as currently_eligible_remaining_count,
+      count(*) filter (
+        where features.status = 'not_found' and features.retry_after_at > ${now}
+      )::int as cooling_down_count
+    from ${userSavedTracks} saved
+    left join ${trackAudioFeatures} features
+      on features.track_id = saved.track_id
+      and features.provider = ${RECCOBEATS_PROVIDER}
+    where saved.user_id = ${userId}
+  `;
+}
+
+export async function getAudioEnrichmentStatus(
+  userId: string,
+  now = new Date(),
+): Promise<AudioEnrichmentStatus> {
+  return withDatabase(async (db) => {
+    const result = await db.execute(buildAudioEnrichmentStatusQuery(userId, now));
+    const row = resultRows<AudioEnrichmentStatusRow>(result)[0];
+    const coverage = calculateSoundProfileCoverage(
+      Number(row?.current_saved_track_count ?? 0),
+      Number(row?.audio_covered_track_count ?? 0),
+    );
+    return {
+      currentSavedTrackCount: coverage.currentSavedTrackCount,
+      audioCoveredTrackCount: coverage.audioCoveredTrackCount,
+      audioCoveragePercent: coverage.audioCoveragePercent,
+      coverageQuality: coverage.coverageQuality,
+      currentlyEligibleRemainingCount: Number(row?.currently_eligible_remaining_count ?? 0),
+      coolingDownCount: Number(row?.cooling_down_count ?? 0),
+    };
   });
 }
 

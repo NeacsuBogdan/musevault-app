@@ -6,7 +6,11 @@ const buttonSource = readFileSync(
   new URL('../../components/audio-enrichment-button.tsx', import.meta.url),
   'utf8',
 );
-const normalizedSource = `${source} ${buttonSource}`.replace(/\s+/g, ' ');
+const controlsSource = readFileSync(
+  new URL('../../components/audio-enrichment-controls.tsx', import.meta.url),
+  'utf8',
+);
+const normalizedSource = `${source} ${buttonSource} ${controlsSource}`.replace(/\s+/g, ' ');
 const nav = readFileSync(
   new URL('../../features/dashboard/data/dashboard.ts', import.meta.url),
   'utf8',
@@ -83,6 +87,7 @@ describe('Audio Profile v2 copy and state contracts', () => {
   });
 
   it('keeps Audio Profile available as real navigation', () => {
+    expect(source).toContain('getAudioEnrichmentStatus(userId)');
     const entry = nav.slice(
       nav.indexOf("label: 'Audio Profile'"),
       nav.indexOf("label: 'Audio Profile'") + 120,

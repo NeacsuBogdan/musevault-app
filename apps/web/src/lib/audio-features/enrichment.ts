@@ -5,6 +5,7 @@ import { withDatabase } from '@/lib/db/client';
 import { trackAudioFeatures, trackEnrichmentRuns } from '@/lib/db/schema';
 import {
   getEnrichmentCandidates,
+  getSavedEnrichmentCandidates,
   NOT_FOUND_COOLDOWN_MS,
   resolveAudioProfileUser,
 } from '@/lib/db/repositories/audio-profile';
@@ -12,6 +13,7 @@ import { reccoBeatsProvider } from './reccobeats';
 import {
   AUDIO_FEATURE_BATCH_LIMIT,
   AUDIO_FEATURE_PROVIDER,
+  type AudioFeatureProviderResult,
   AudioFeatureProviderError,
 } from './provider';
 
@@ -22,6 +24,7 @@ export type EnrichmentResultCode =
   | 'rate_limited'
   | 'provider_unavailable'
   | 'provider_invalid_response';
+export type EnrichmentCandidateScope = 'all_relevant' | 'saved_library';
 export class EnrichmentError extends Error {
   constructor(
     public readonly code: EnrichmentResultCode | 'unexpected_failure',
@@ -38,7 +41,80 @@ function publicCode(error: AudioFeatureProviderError): EnrichmentResultCode {
       ? 'provider_invalid_response'
       : 'provider_unavailable';
 }
-export async function processEnrichmentRequest(spotifyAccountId: string) {
+
+async function persistProviderResult(result: AudioFeatureProviderResult, now: Date) {
+  await withDatabase((db) =>
+    db.transaction(async (tx) => {
+      if (result.available.length)
+        await tx
+          .insert(trackAudioFeatures)
+          .values(
+            result.available.map((item) => ({
+              trackId: item.spotifyTrackId,
+              provider: AUDIO_FEATURE_PROVIDER,
+              providerTrackId: item.providerTrackId,
+              status: 'available',
+              acousticness: item.acousticness,
+              danceability: item.danceability,
+              energy: item.energy,
+              instrumentalness: item.instrumentalness,
+              liveness: item.liveness,
+              loudness: item.loudness,
+              speechiness: item.speechiness,
+              tempo: item.tempo,
+              valence: item.valence,
+              fetchedAt: now,
+              retryAfterAt: null,
+              updatedAt: now,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [trackAudioFeatures.trackId, trackAudioFeatures.provider],
+            set: {
+              providerTrackId: sql`excluded.provider_track_id`,
+              status: 'available',
+              acousticness: sql`excluded.acousticness`,
+              danceability: sql`excluded.danceability`,
+              energy: sql`excluded.energy`,
+              instrumentalness: sql`excluded.instrumentalness`,
+              liveness: sql`excluded.liveness`,
+              loudness: sql`excluded.loudness`,
+              speechiness: sql`excluded.speechiness`,
+              tempo: sql`excluded.tempo`,
+              valence: sql`excluded.valence`,
+              fetchedAt: now,
+              retryAfterAt: null,
+              updatedAt: now,
+            },
+          });
+      if (result.notFoundSpotifyTrackIds.length)
+        await tx
+          .insert(trackAudioFeatures)
+          .values(
+            result.notFoundSpotifyTrackIds.map((trackId) => ({
+              trackId,
+              provider: AUDIO_FEATURE_PROVIDER,
+              status: 'not_found',
+              retryAfterAt: new Date(now.getTime() + NOT_FOUND_COOLDOWN_MS),
+              updatedAt: now,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [trackAudioFeatures.trackId, trackAudioFeatures.provider],
+            set: {
+              status: 'not_found',
+              retryAfterAt: new Date(now.getTime() + NOT_FOUND_COOLDOWN_MS),
+              updatedAt: now,
+            },
+          });
+    }),
+  );
+}
+
+export async function processEnrichmentRequest(
+  spotifyAccountId: string,
+  candidateScope: EnrichmentCandidateScope = 'all_relevant',
+) {
   const userId = await resolveAudioProfileUser(spotifyAccountId);
   if (!userId) throw new EnrichmentError('unexpected_failure');
   const run = await withDatabase((db) =>
@@ -52,7 +128,10 @@ export async function processEnrichmentRequest(spotifyAccountId: string) {
     }),
   );
   if (!run) throw new EnrichmentError('unexpected_failure');
-  const candidates = await getEnrichmentCandidates(userId);
+  const candidates =
+    candidateScope === 'saved_library'
+      ? await getSavedEnrichmentCandidates(userId)
+      : await getEnrichmentCandidates(userId);
   let attempted = 0,
     enriched = 0,
     notFound = 0;
@@ -63,74 +142,22 @@ export async function processEnrichmentRequest(spotifyAccountId: string) {
       offset += AUDIO_FEATURE_BATCH_LIMIT, batch += 1
     ) {
       const ids = candidates.slice(offset, offset + AUDIO_FEATURE_BATCH_LIMIT);
-      const result = await reccoBeatsProvider.loadForSpotifyTrackIds(ids);
+      let result: AudioFeatureProviderResult;
+      try {
+        result = await reccoBeatsProvider.loadForSpotifyTrackIds(ids);
+      } catch (error) {
+        if (error instanceof AudioFeatureProviderError && error.partialAvailable.length) {
+          await persistProviderResult(
+            { available: [...error.partialAvailable], notFoundSpotifyTrackIds: [] },
+            new Date(),
+          );
+          attempted += ids.length;
+          enriched += error.partialAvailable.length;
+        }
+        throw error;
+      }
       const now = new Date();
-      await withDatabase((db) =>
-        db.transaction(async (tx) => {
-          if (result.available.length)
-            await tx
-              .insert(trackAudioFeatures)
-              .values(
-                result.available.map((item) => ({
-                  trackId: item.spotifyTrackId,
-                  provider: AUDIO_FEATURE_PROVIDER,
-                  providerTrackId: item.providerTrackId,
-                  status: 'available',
-                  acousticness: item.acousticness,
-                  danceability: item.danceability,
-                  energy: item.energy,
-                  instrumentalness: item.instrumentalness,
-                  liveness: item.liveness,
-                  loudness: item.loudness,
-                  speechiness: item.speechiness,
-                  tempo: item.tempo,
-                  valence: item.valence,
-                  fetchedAt: now,
-                  retryAfterAt: null,
-                  updatedAt: now,
-                })),
-              )
-              .onConflictDoUpdate({
-                target: [trackAudioFeatures.trackId, trackAudioFeatures.provider],
-                set: {
-                  providerTrackId: sql`excluded.provider_track_id`,
-                  status: 'available',
-                  acousticness: sql`excluded.acousticness`,
-                  danceability: sql`excluded.danceability`,
-                  energy: sql`excluded.energy`,
-                  instrumentalness: sql`excluded.instrumentalness`,
-                  liveness: sql`excluded.liveness`,
-                  loudness: sql`excluded.loudness`,
-                  speechiness: sql`excluded.speechiness`,
-                  tempo: sql`excluded.tempo`,
-                  valence: sql`excluded.valence`,
-                  fetchedAt: now,
-                  retryAfterAt: null,
-                  updatedAt: now,
-                },
-              });
-          if (result.notFoundSpotifyTrackIds.length)
-            await tx
-              .insert(trackAudioFeatures)
-              .values(
-                result.notFoundSpotifyTrackIds.map((trackId) => ({
-                  trackId,
-                  provider: AUDIO_FEATURE_PROVIDER,
-                  status: 'not_found',
-                  retryAfterAt: new Date(now.getTime() + NOT_FOUND_COOLDOWN_MS),
-                  updatedAt: now,
-                })),
-              )
-              .onConflictDoUpdate({
-                target: [trackAudioFeatures.trackId, trackAudioFeatures.provider],
-                set: {
-                  status: 'not_found',
-                  retryAfterAt: new Date(now.getTime() + NOT_FOUND_COOLDOWN_MS),
-                  updatedAt: now,
-                },
-              });
-        }),
-      );
+      await persistProviderResult(result, now);
       attempted += ids.length;
       enriched += result.available.length;
       notFound += result.notFoundSpotifyTrackIds.length;

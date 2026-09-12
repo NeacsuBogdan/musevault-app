@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { ExternalLink, Music2 } from 'lucide-react';
 import { redirect } from 'next/navigation';
 
-import { AudioEnrichmentButton } from '@/components/audio-enrichment-button';
+import { AudioEnrichmentControls } from '@/components/audio-enrichment-controls';
 import { readSession } from '@/lib/auth/session';
 import {
   getAudioProfileSummary,
+  getAudioEnrichmentStatus,
   resolveAudioProfileUser,
   type SoundProfileTrack,
 } from '@/lib/db/repositories/audio-profile';
@@ -29,11 +30,6 @@ const featureLabels: Record<BoundedSoundFeature, string> = {
   valence: 'Valence',
 };
 const boundedFeatureOrder = Object.keys(featureLabels) as BoundedSoundFeature[];
-const qualityLabels = { LOW: 'Low coverage', MEDIUM: 'Medium coverage', HIGH: 'High coverage' };
-
-function formatPercent(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}%`;
-}
 
 function formatBounded(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
@@ -72,7 +68,10 @@ export default async function AudioProfilePage() {
   if (!session) redirect('/');
   const userId = await resolveAudioProfileUser(session.accountId);
   if (!userId) redirect('/library');
-  const profile = await getAudioProfileSummary(userId);
+  const [profile, enrichmentStatus] = await Promise.all([
+    getAudioProfileSummary(userId),
+    getAudioEnrichmentStatus(userId),
+  ]);
   const { coverage } = profile;
 
   return (
@@ -106,28 +105,7 @@ export default async function AudioProfilePage() {
           currently requires no API key.
         </aside>
 
-        <section className="mt-10 flex flex-wrap items-end justify-between gap-6 rounded-panel border border-border-subtle bg-surface p-7">
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-section-title font-semibold">Current saved-library coverage</h2>
-              <span className="rounded-full border border-border-strong px-3 py-1 text-caption font-semibold uppercase tracking-wide text-text-secondary">
-                {qualityLabels[coverage.coverageQuality]}
-              </span>
-            </div>
-            <p className="mt-3 text-lg font-semibold">
-              {coverage.audioCoveredTrackCount.toLocaleString()} of{' '}
-              {coverage.currentSavedTrackCount.toLocaleString()} saved tracks ·{' '}
-              {formatPercent(coverage.audioCoveragePercent)}
-            </p>
-            <p className="mt-2 max-w-3xl text-body-sm text-text-secondary">
-              Coverage includes only tracks currently saved in your library with cached, available
-              ReccoBeats features. Removed or otherwise stale cached tracks are excluded.
-            </p>
-          </div>
-          {coverage.currentSavedTrackCount > 0 ? (
-            <AudioEnrichmentButton hasCoverage={coverage.audioCoveredTrackCount > 0} />
-          ) : null}
-        </section>
+        <AudioEnrichmentControls initialStatus={enrichmentStatus} />
 
         {profile.lastRun?.status === 'failed' ? (
           <p

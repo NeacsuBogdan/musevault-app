@@ -8,6 +8,18 @@ saved-tracks library, conservative incremental synchronization with automatic fu
 access-token refresh, logout, an authenticated dashboard at `/dashboard`, Listening Intelligence v2
 at `/listening`, coverage-aware Audio Profile v2 sound intelligence at `/audio-profile`, and a Neon
 database foundation.
+Audio Profile offers explicit single-batch enrichment and browser-orchestrated “Enrich all
+remaining” processing. Bulk mode sends one bounded server POST at a time, persists every completed
+batch, and stops when the user pauses, the tab closes, eligible work ends, progress stalls, or the
+provider reports a failure or rate limit.
+The separate **Refresh status** action performs only an authenticated, database-only GET. It updates
+coverage, eligibility, and cooldown counts without starting or resuming enrichment; provider-backed
+single-batch and bulk work always require their own explicit action.
+Within each normal provider chunk, MuseVault confirms only omitted Spotify mappings and audio
+features with one additional request for that omitted subset. A 30-day cooldown is applied only
+after the same item is omitted from two successful responses in the explicit operation; this is
+provider-availability evidence, not proof of permanent catalog absence. Confirmation failures and
+rate limits stop enrichment without creating missing cooldowns.
 The listening page uses exact database windows for Listening Pulse, a bounded Rotation Score, and
 primary-artist Recorded Momentum while keeping captured Spotify affinity separate. The dashboard
 uses the complete latest synchronized PostgreSQL library snapshot for its real library overview and
