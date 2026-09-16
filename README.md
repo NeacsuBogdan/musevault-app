@@ -6,8 +6,8 @@ saved tracks, and will eventually use that library as the basis for independent 
 The current Next.js App Router application provides secure Spotify connection, a protected
 saved-tracks library, conservative incremental synchronization with automatic full reconciliation,
 access-token refresh, logout, an authenticated dashboard at `/dashboard`, Listening Intelligence v2
-at `/listening`, coverage-aware Audio Profile v2 sound intelligence at `/audio-profile`, and a Neon
-database foundation.
+at `/listening`, deterministic rolling Music Evolution comparisons at `/evolution`, coverage-aware
+Audio Profile v2 sound intelligence at `/audio-profile`, and a Neon database foundation.
 Audio Profile offers explicit single-batch enrichment and browser-orchestrated “Enrich all
 remaining” processing. Bulk mode sends one bounded server POST at a time, persists every completed
 batch, and stops when the user pauses, the tab closes, eligible work ends, progress stalls, or the
@@ -33,6 +33,7 @@ authorization. See the
 [database foundation](docs/database-foundation.md), [dashboard data guide](docs/dashboard-data.md),
 [listening capture guide](docs/listening-intelligence.md),
 [Listening Intelligence v2 guide](docs/listening.md),
+[Music Evolution Foundation guide](docs/music-evolution.md),
 [Audio Profile v2 guide](docs/audio-profile.md),
 [track enrichment guide](docs/track-enrichment.md),
 [intelligence foundation](docs/intelligence.md),
