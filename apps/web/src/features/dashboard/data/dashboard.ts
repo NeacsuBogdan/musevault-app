@@ -41,6 +41,11 @@ export const desktopNavigation: readonly DashboardNavigationEntry[] = [
     icon: 'history',
   },
   {
+    label: 'Music Evolution',
+    href: '/evolution',
+    icon: 'analytics',
+  },
+  {
     label: 'Audio Profile',
     href: '/audio-profile',
     icon: 'music',
